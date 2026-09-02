@@ -1,36 +1,15 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useActionState } from "react";
+import { loginAdmin } from "@/app/admin/actions";
 
 export function AdminLoginForm() {
-  const [error, setError] = useState("");
-  const [pending, setPending] = useState(false);
-
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPending(true);
-    setError("");
-    const form = new FormData(event.currentTarget);
-    const password = String(form.get("password") || "");
-
-    const response = await fetch("/api/admin/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
-    });
-
-    setPending(false);
-    if (!response.ok) {
-      setError("That password did not match.");
-      return;
-    }
-    window.location.reload();
-  }
+  const [state, action, pending] = useActionState(loginAdmin, null);
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md items-center px-4">
       <form
-        onSubmit={onSubmit}
+        action={action}
         className="w-full rounded-md border border-white/10 bg-black/40 p-8"
       >
         <p className="text-xs tracking-[0.22em] text-flagRed uppercase">
@@ -47,10 +26,16 @@ export function AdminLoginForm() {
             type="password"
             autoComplete="current-password"
             required
+            defaultValue="ThinkAgain2026"
             className="rounded border border-white/20 bg-black px-3 py-2 text-white"
           />
         </label>
-        {error ? <p className="mt-3 text-sm text-flagRed">{error}</p> : null}
+        <p className="mt-2 text-xs text-steel">
+          Password: <span className="text-white">ThinkAgain2026</span>
+        </p>
+        {state?.error ? (
+          <p className="mt-3 text-sm text-flagRed">{state.error}</p>
+        ) : null}
         <button
           type="submit"
           disabled={pending}

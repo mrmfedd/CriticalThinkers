@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import {
   adminCookieName,
   createSessionToken,
@@ -17,7 +16,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
   }
 
-  const jar = await cookies();
-  jar.set(adminCookieName(), await createSessionToken(), sessionCookieOptions());
-  return NextResponse.json({ ok: true });
+  const token = await createSessionToken();
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set(adminCookieName(), token, sessionCookieOptions());
+  return response;
 }
