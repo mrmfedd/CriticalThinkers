@@ -28,8 +28,7 @@ export default function HomePage() {
             {site.tagline.toUpperCase()}
           </h1>
           <p className="mt-4 max-w-2xl text-base text-chrome">
-            Gear for citizens who still ask the hard questions. Designed by{" "}
-            {site.owner}.
+            Gear for citizens who still ask the hard questions.
           </p>
           <Link
             href="/shop"
