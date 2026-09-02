@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { Modal } from "@/components/Modal";
+import { AdminHeader } from "@/components/admin/AdminHeader";
 import type { Product } from "@/lib/products";
 
 type BrandImages = {
@@ -124,11 +124,6 @@ export function ImageControlPanel({
     setMessage(`Restored the original ${title} image.`);
   }
 
-  async function logout() {
-    await fetch("/api/admin/logout", { method: "POST" });
-    window.location.href = "/admin";
-  }
-
   const slots = useMemo(
     () => [
       {
@@ -153,33 +148,10 @@ export function ImageControlPanel({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <header className="mb-10 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
-        <div>
-          <p className="text-xs tracking-[0.22em] text-flagRed uppercase">
-            Control panel
-          </p>
-          <h1 className="mt-1 font-display text-4xl text-white">Edit images</h1>
-          <p className="mt-2 max-w-xl text-sm text-steel">
-            Replace the logo, homepage flag, or any shop photo. JPEG, PNG, or
-            WebP up to 8MB.
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <Link
-            href="/shop"
-            className="rounded border border-white/20 px-4 py-2 font-display text-xs tracking-[0.14em] text-white uppercase"
-          >
-            View shop
-          </Link>
-          <button
-            type="button"
-            onClick={logout}
-            className="rounded border border-white/20 px-4 py-2 font-display text-xs tracking-[0.14em] text-white uppercase"
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
+      <AdminHeader
+        title="Edit images"
+        description="Replace the logo, homepage flag, or any shop photo. JPEG, PNG, or WebP up to 8MB."
+      />
 
       {message ? (
         <p className="mb-6 rounded border border-white/10 bg-black/40 px-4 py-3 text-sm text-chrome">

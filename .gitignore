@@ -7,3 +7,5 @@ out
 !.env.example
 public/uploads/*
 !public/uploads/.gitkeep
+data/paypal.json
+data/orders.json

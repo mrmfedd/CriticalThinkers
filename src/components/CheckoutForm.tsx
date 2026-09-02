@@ -1,15 +1,72 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart-context";
 import { formatPrice } from "@/lib/products";
 import { site } from "@/lib/site";
+import { PayPalButtons } from "@/components/PayPalButtons";
 
-export function CheckoutForm() {
+const requiredFields = [
+  "name",
+  "email",
+  "phone",
+  "address",
+  "city",
+  "state",
+  "zip",
+];
+
+type CheckoutFormProps = {
+  paypal: {
+    connected: boolean;
+    clientId: string;
+    mode: "sandbox" | "live";
+  };
+};
+
+export function CheckoutForm({ paypal }: CheckoutFormProps) {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const { items, subtotal, clearCart } = useCart();
   const [error, setError] = useState("");
+
+  const collectCustomer = useCallback(() => {
+    const form = formRef.current;
+    if (!form) throw new Error("Checkout form is missing.");
+    const data = new FormData(form);
+    const missing = requiredFields.some(
+      (field) => !String(data.get(field) || "").trim(),
+    );
+    if (missing) {
+      throw new Error("Fill in your shipping details before paying with PayPal.");
+    }
+    return Object.fromEntries(data.entries());
+  }, []);
+
+  const onPaid = useCallback(
+    (captureId: string) => {
+      try {
+        const customer = collectCustomer();
+        window.sessionStorage.setItem(
+          "ct-last-order",
+          JSON.stringify({
+            customer,
+            items,
+            subtotal,
+            captureId,
+            paidWith: "paypal",
+            placedAt: new Date().toISOString(),
+          }),
+        );
+      } catch {
+        // Payment already captured; still complete checkout.
+      }
+      clearCart();
+      router.push(`/thank-you?paid=paypal&id=${encodeURIComponent(captureId)}`);
+    },
+    [clearCart, collectCustomer, items, router, subtotal],
+  );
 
   if (items.length === 0) {
     return (
@@ -23,34 +80,41 @@ export function CheckoutForm() {
     );
   }
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
+  function onSampleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const required = ["name", "email", "phone", "address", "city", "state", "zip"];
-    const missing = required.some((field) => !String(form.get(field) || "").trim());
-    if (missing) {
-      setError("Please complete every field so we can place the sample order.");
-      return;
+    try {
+      const customer = collectCustomer();
+      window.sessionStorage.setItem(
+        "ct-last-order",
+        JSON.stringify({
+          customer,
+          items,
+          subtotal,
+          paidWith: "sample",
+          placedAt: new Date().toISOString(),
+        }),
+      );
+      clearCart();
+      router.push("/thank-you");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Complete every field.");
     }
-
-    const order = {
-      customer: Object.fromEntries(form.entries()),
-      items,
-      subtotal,
-      placedAt: new Date().toISOString(),
-    };
-    window.sessionStorage.setItem("ct-last-order", JSON.stringify(order));
-    clearCart();
-    router.push("/thank-you");
   }
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+    <form
+      ref={formRef}
+      onSubmit={paypal.connected ? (event) => event.preventDefault() : onSampleSubmit}
+      className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]"
+    >
       <div className="grid gap-4 rounded-md border border-white/10 bg-black/30 p-6">
         <h1 className="font-display text-4xl text-white">Checkout</h1>
         <p className="text-sm text-steel">
-          Sample checkout for {site.name}. Orders are stored locally and routed
-          to {site.owner}.
+          {paypal.connected
+            ? `Pay with PayPal. Funds go to ${site.owner}. ${
+                paypal.mode === "sandbox" ? "Sandbox mode is on." : ""
+              }`
+            : `PayPal is not connected yet. Connect it in Admin → PayPal, or place a sample order.`}
         </p>
         <label className="grid gap-1 text-sm">
           Full name
@@ -112,12 +176,22 @@ export function CheckoutForm() {
           </label>
         </div>
         {error ? <p className="text-sm text-flagRed">{error}</p> : null}
-        <button
-          type="submit"
-          className="rounded bg-flagRed px-6 py-3 font-display tracking-[0.16em] text-white uppercase"
-        >
-          Place sample order
-        </button>
+        {paypal.connected ? (
+          <PayPalButtons
+            clientId={paypal.clientId}
+            items={items}
+            validate={collectCustomer}
+            onPaid={onPaid}
+            onError={setError}
+          />
+        ) : (
+          <button
+            type="submit"
+            className="rounded bg-flagRed px-6 py-3 font-display tracking-[0.16em] text-white uppercase"
+          >
+            Place sample order
+          </button>
+        )}
       </div>
       <aside className="h-fit rounded-md border border-white/10 bg-black/40 p-6">
         <h2 className="font-display text-2xl text-white">Your gear</h2>
