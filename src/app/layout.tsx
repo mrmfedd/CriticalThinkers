@@ -3,6 +3,8 @@ import { Oswald, IBM_Plex_Sans } from "next/font/google";
 import { CartProvider } from "@/lib/cart-context";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { StorefrontChrome } from "@/components/StorefrontChrome";
+import { getBrandImages } from "@/lib/image-store";
 import { site } from "@/lib/site";
 import "./globals.css";
 
@@ -27,20 +29,25 @@ export const metadata: Metadata = {
     "Make America Think Again. Apparel, drinkware, and gear from CriticalThinkers.us.",
 };
 
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const brand = getBrandImages();
+
   return (
     <html lang="en">
       <body className={`${display.variable} ${body.variable} font-body`}>
         <CartProvider>
-          <Header />
-          <main className="mx-auto min-h-[70vh] max-w-6xl px-4 py-10">
+          <StorefrontChrome
+            header={<Header logoSrc={brand.logo} />}
+            footer={<Footer logoSrc={brand.logo} />}
+          >
             {children}
-          </main>
-          <Footer />
+          </StorefrontChrome>
         </CartProvider>
       </body>
     </html>

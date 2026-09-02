@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { site } from "@/lib/site";
+import { getBrandImages } from "@/lib/image-store";
 
 export const metadata: Metadata = {
   title: "About",
 };
 
 export default function AboutPage() {
+  const brand = getBrandImages();
   return (
     <article className="grid gap-8 md:grid-cols-[1.2fr_0.8fr]">
       <div>
@@ -33,7 +35,7 @@ export default function AboutPage() {
       </div>
       <aside className="h-fit rounded-md border border-white/10 bg-black/40 p-6">
         <img
-          src="/brand/logo.jpg"
+          src={brand.logo}
           alt={site.name}
           className="mb-5 w-full rounded-sm border border-white/10"
         />

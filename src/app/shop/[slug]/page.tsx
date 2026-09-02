@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getProduct, products } from "@/lib/products";
+import { products } from "@/lib/products";
+import { getProduct } from "@/lib/image-store";
 import { ProductDetail } from "@/components/ProductDetail";
 
 type Props = {

@@ -13,7 +13,7 @@ const links = [
   { href: "/contact", label: "Contact" },
 ];
 
-export function Header() {
+export function Header({ logoSrc = "/brand/logo.jpg" }: { logoSrc?: string }) {
   const pathname = usePathname();
   const { itemCount } = useCart();
   const [open, setOpen] = useState(false);
@@ -23,7 +23,7 @@ export function Header() {
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
         <Link href="/" className="flex items-center gap-3" onClick={() => setOpen(false)}>
           <img
-            src="/brand/logo.jpg"
+            src={logoSrc}
             alt={site.name}
             className="h-12 w-auto rounded-sm border border-white/10 md:h-14"
           />

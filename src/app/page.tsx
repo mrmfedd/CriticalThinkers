@@ -1,23 +1,24 @@
 import Link from "next/link";
-import { getFeaturedProducts } from "@/lib/products";
+import { getBrandImages, getFeaturedProducts } from "@/lib/image-store";
 import { ProductCard } from "@/components/ProductCard";
 import { site } from "@/lib/site";
 
 export default function HomePage() {
   const featured = getFeaturedProducts();
+  const brand = getBrandImages();
 
   return (
     <div className="grid gap-16">
       <section className="relative overflow-hidden rounded-md border border-white/10">
         <img
-          src="/products/hero-flag.png"
+          src={brand.hero}
           alt="American flag"
           className="h-[520px] w-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/20" />
         <div className="absolute inset-0 flex flex-col items-center justify-end px-6 pb-12 text-center">
           <img
-            src="/brand/logo.jpg"
+            src={brand.logo}
             alt={site.name}
             className="mb-6 h-24 w-auto rounded-sm border border-white/20 shadow-metal md:h-32"
           />

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ShopGrid } from "@/components/ShopGrid";
+import { getCatalog } from "@/lib/image-store";
 
 export const metadata: Metadata = {
   title: "Shop",
@@ -15,7 +16,7 @@ export default function ShopPage() {
         collection.
       </p>
       <div className="mt-10">
-        <ShopGrid />
+        <ShopGrid items={getCatalog()} />
       </div>
     </div>
   );

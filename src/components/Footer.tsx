@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { site } from "@/lib/site";
 
-export function Footer() {
+export function Footer({ logoSrc = "/brand/logo.jpg" }: { logoSrc?: string }) {
   return (
     <footer className="mt-16 border-t border-white/10 bg-black/50">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 md:grid-cols-3">
         <div>
           <img
-            src="/brand/logo.jpg"
+            src={logoSrc}
             alt={site.name}
             className="mb-4 h-16 w-auto rounded-sm border border-white/10"
           />

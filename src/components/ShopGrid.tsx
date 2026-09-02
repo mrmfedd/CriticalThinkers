@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { products, type ProductCategory } from "@/lib/products";
+import { products, type Product, type ProductCategory } from "@/lib/products";
 import { ProductCard } from "@/components/ProductCard";
 
 const filters: Array<"All" | ProductCategory> = [
@@ -11,14 +11,14 @@ const filters: Array<"All" | ProductCategory> = [
   "Drinkware",
 ];
 
-export function ShopGrid() {
+export function ShopGrid({ items = products }: { items?: Product[] }) {
   const [filter, setFilter] = useState<(typeof filters)[number]>("All");
   const visible = useMemo(
     () =>
       filter === "All"
-        ? products
-        : products.filter((product) => product.category === filter),
-    [filter],
+        ? items
+        : items.filter((product) => product.category === filter),
+    [filter, items],
   );
 
   return (
