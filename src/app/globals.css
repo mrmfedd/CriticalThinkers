@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-ink text-chrome antialiased;
+  background-image:
+    radial-gradient(ellipse at top, rgba(200, 16, 46, 0.12), transparent 42%),
+    radial-gradient(ellipse at 85% 10%, rgba(0, 40, 104, 0.35), transparent 40%);
+}
+
+.chrome-text {
+  background-image: linear-gradient(180deg, #ffffff 0%, #c9d4e3 38%, #7f93ab 78%, #e8eef6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+
+.star-bar {
+  background:
+    linear-gradient(#0b1220, #0b1220) padding-box,
+    linear-gradient(90deg, #c8102e, #d7dee8, #002868) border-box;
+  border: 2px solid transparent;
+}
+
+@layer utilities {
+  .outline-patriotic {
+    text-shadow:
+      1px 1px 0 #c8102e,
+      -1px -1px 0 #002868;
+  }
+}
