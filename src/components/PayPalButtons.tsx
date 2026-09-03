@@ -3,13 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import type { CartItem } from "@/lib/cart-context";
 
+type PayPalButtonsInstance = {
+  close: () => Promise<void> | void;
+  render: (target: HTMLElement) => Promise<void>;
+};
+
 type PayPalNamespace = {
   Buttons: (options: {
     style?: { color?: string; shape?: string; label?: string };
     createOrder: () => Promise<string>;
     onApprove: (data: { orderID: string }) => Promise<void>;
     onError?: (error: unknown) => void;
-  }) => { render: (target: HTMLElement) => Promise<void> };
+  }) => PayPalButtonsInstance;
 };
 
 declare global {
@@ -20,12 +25,23 @@ declare global {
 
 type PayPalButtonsProps = {
   clientId: string;
+  mode?: "sandbox" | "live";
   items: CartItem[];
   disabled?: boolean;
   validate?: () => void;
   onPaid: (captureId: string) => void | Promise<void>;
   onError: (message: string) => void;
 };
+
+function sdkSrc(clientId: string) {
+  const params = new URLSearchParams({
+    "client-id": clientId,
+    currency: "USD",
+    intent: "capture",
+    components: "buttons",
+  });
+  return `https://www.paypal.com/sdk/js?${params.toString()}`;
+}
 
 export function PayPalButtons({
   clientId,
@@ -39,20 +55,30 @@ export function PayPalButtons({
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const existing = document.getElementById("paypal-sdk");
-    if (window.paypal) {
+    if (!clientId) return;
+    const src = sdkSrc(clientId);
+    const existing = document.getElementById("paypal-sdk") as HTMLScriptElement | null;
+    if (window.paypal && existing?.src === src) {
       setReady(true);
       return;
     }
-    if (existing) {
-      existing.addEventListener("load", () => setReady(true), { once: true });
+    if (existing && existing.src !== src) {
+      existing.remove();
+      delete window.paypal;
+      setReady(false);
+    }
+    const current = document.getElementById("paypal-sdk") as HTMLScriptElement | null;
+    if (current) {
+      if (window.paypal) {
+        setReady(true);
+        return;
+      }
+      current.addEventListener("load", () => setReady(true), { once: true });
       return;
     }
     const script = document.createElement("script");
     script.id = "paypal-sdk";
-    script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(
-      clientId,
-    )}&currency=USD&intent=capture`;
+    script.src = src;
     script.async = true;
     script.onload = () => setReady(true);
     script.onerror = () => onError("PayPal failed to load. Refresh and try again.");
@@ -62,7 +88,6 @@ export function PayPalButtons({
   useEffect(() => {
     if (!ready || !host.current || disabled || !window.paypal) return;
     const node = host.current;
-    node.innerHTML = "";
     const buttons = window.paypal.Buttons({
       style: { color: "gold", shape: "rect", label: "paypal" },
       createOrder: async () => {
@@ -106,9 +131,11 @@ export function PayPalButtons({
         onError(error instanceof Error ? error.message : "PayPal checkout failed.");
       },
     });
-    void buttons.render(node);
+    void buttons.render(node).catch((error) => {
+      onError(error instanceof Error ? error.message : "PayPal buttons failed to render.");
+    });
     return () => {
-      node.innerHTML = "";
+      void buttons.close();
     };
   }, [ready, disabled, items, onPaid, onError, validate]);
 

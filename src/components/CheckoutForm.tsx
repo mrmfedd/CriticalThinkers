@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart-context";
 import { formatPrice } from "@/lib/products";
@@ -25,11 +25,31 @@ type CheckoutFormProps = {
   };
 };
 
-export function CheckoutForm({ paypal }: CheckoutFormProps) {
+export function CheckoutForm({ paypal: initialPaypal }: CheckoutFormProps) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const { items, subtotal, clearCart } = useCart();
+  const [paypal, setPaypal] = useState(initialPaypal);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadConfig() {
+      try {
+        const response = await fetch("/api/paypal/config", { cache: "no-store" });
+        const payload = (await response.json()) as CheckoutFormProps["paypal"];
+        if (!cancelled && payload && typeof payload.connected === "boolean") {
+          setPaypal(payload);
+        }
+      } catch {
+        // Keep the server snapshot if the config endpoint is unreachable.
+      }
+    }
+    void loadConfig();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const collectCustomer = useCallback(() => {
     const form = formRef.current;
@@ -198,6 +218,7 @@ export function CheckoutForm({ paypal }: CheckoutFormProps) {
         {paypal.connected ? (
           <PayPalButtons
             clientId={paypal.clientId}
+            mode={paypal.mode}
             items={items}
             validate={collectCustomer}
             onPaid={onPaid}

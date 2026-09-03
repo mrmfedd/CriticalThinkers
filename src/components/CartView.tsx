@@ -79,6 +79,7 @@ export function CartView() {
         <p className="mt-2 text-sm text-steel">Shipping calculated at checkout.</p>
         <Link
           href="/checkout"
+          prefetch={false}
           className="mt-6 block rounded bg-flagRed px-6 py-3 text-center font-display tracking-[0.16em] text-white uppercase"
         >
           Checkout
