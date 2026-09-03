@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { formatPrice, type Product } from "@/lib/products";
+import { formatPrice, imageFor, type Product } from "@/lib/products";
 import { GarmentPreview } from "@/components/GarmentPreview";
 
 export function ProductCard({ product }: { product: Product }) {
@@ -12,7 +12,7 @@ export function ProductCard({ product }: { product: Product }) {
     <article className="group overflow-hidden rounded-md border border-white/10 bg-black/40">
       <Link href={`/shop/${product.slug}`} className="block">
         <GarmentPreview
-          image={product.image}
+          image={imageFor(product, color.name)}
           alt={product.name}
           color={color.hex}
           blendMode={product.blendMode}

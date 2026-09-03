@@ -6,6 +6,7 @@ import { ProductCard } from "@/components/ProductCard";
 
 const filters: Array<"All" | ProductCategory> = [
   "All",
+  "T-shirts",
   "Apparel",
   "Accessories",
   "Drinkware",

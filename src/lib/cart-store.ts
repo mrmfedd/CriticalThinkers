@@ -1,7 +1,8 @@
 import { getCatalog } from "@/lib/image-store";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase";
-import type { CartItem, StoredOrder } from "@/lib/cart-types";
+import { imageFor } from "@/lib/products";
 import type { ProductColor } from "@/lib/products";
+import type { CartItem, StoredOrder } from "@/lib/cart-types";
 
 export type CartLineInput = {
   slug: string;
@@ -70,7 +71,7 @@ export function toCartItem(input: CartLineInput, product: ReturnType<typeof getC
     id: `${product.slug}::${size}::${matched.name}`,
     slug: product.slug,
     name: product.name,
-    image: product.image,
+    image: imageFor(product, matched.name),
     price: product.price,
     quantity,
     size,

@@ -1,8 +1,15 @@
-export type ProductCategory = "Apparel" | "Accessories" | "Drinkware";
+import { designTees } from "@/lib/design-tees";
+
+export type ProductCategory = "T-shirts" | "Apparel" | "Accessories" | "Drinkware";
 
 export type ProductColor = {
   name: string;
   hex: string;
+};
+
+export type ProductViews = {
+  front: string;
+  back: string;
 };
 
 export type Product = {
@@ -15,9 +22,18 @@ export type Product = {
   details: string[];
   sizes: string[];
   colors: ProductColor[];
+  views?: Record<string, ProductViews>;
   featured?: boolean;
-  blendMode: "multiply" | "color-burn";
+  blendMode?: "multiply" | "color-burn";
 };
+
+export function imageFor(
+  product: Product,
+  colorName = product.colors[0]?.name,
+  view: keyof ProductViews = "front",
+) {
+  return product.views?.[colorName]?.[view] || product.image;
+}
 
 export const products: Product[] = [
   {
@@ -222,6 +238,7 @@ export const products: Product[] = [
     ],
     blendMode: "multiply",
   },
+  ...designTees,
 ];
 
 export function getProduct(slug: string) {

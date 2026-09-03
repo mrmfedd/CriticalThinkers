@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useCart } from "@/lib/cart-context";
-import { formatPrice, type Product } from "@/lib/products";
+import { formatPrice, imageFor, type Product } from "@/lib/products";
 import { GarmentPreview } from "@/components/GarmentPreview";
 import { Modal } from "@/components/Modal";
 
@@ -10,8 +10,10 @@ export function ProductDetail({ product }: { product: Product }) {
   const { addItem } = useCart();
   const [size, setSize] = useState(product.sizes[0]);
   const [color, setColor] = useState(product.colors[0]);
+  const [view, setView] = useState<"front" | "back">("front");
   const [quantity, setQuantity] = useState(1);
   const [addedOpen, setAddedOpen] = useState(false);
+  const preview = imageFor(product, color.name, view);
 
   const total = useMemo(
     () => product.price * quantity,
@@ -23,7 +25,7 @@ export function ProductDetail({ product }: { product: Product }) {
       {
         slug: product.slug,
         name: product.name,
-        image: product.image,
+        image: imageFor(product, color.name),
         price: product.price,
         size,
         color,
@@ -35,13 +37,37 @@ export function ProductDetail({ product }: { product: Product }) {
 
   return (
     <div className="grid gap-10 lg:grid-cols-2">
-      <GarmentPreview
-        image={product.image}
-        alt={`${product.name} in ${color.name}`}
-        color={color.hex}
-        blendMode={product.blendMode}
-        className="rounded-md border border-white/10"
-      />
+      <div>
+        <GarmentPreview
+          image={preview}
+          alt={`${product.name} in ${color.name}`}
+          color={color.hex}
+          blendMode={product.blendMode}
+          className="rounded-md border border-white/10"
+        />
+        {product.views ? (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {(["front", "back"] as const).map((option) => {
+              const selected = option === view;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setView(option)}
+                  className={`rounded border px-3 py-2 font-display text-xs tracking-[0.14em] uppercase ${
+                    selected
+                      ? "border-white bg-white text-ink"
+                      : "border-white/20 text-chrome hover:border-white"
+                  }`}
+                >
+                  {option}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
       <div>
         <p className="text-xs tracking-[0.22em] text-flagRed uppercase">
           {product.category}
