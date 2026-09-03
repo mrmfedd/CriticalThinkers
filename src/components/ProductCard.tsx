@@ -2,17 +2,33 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { formatPrice, imageFor, type Product } from "@/lib/products";
+import {
+  formatPrice,
+  imageFor,
+  type Product,
+  type ProductViews,
+} from "@/lib/products";
 import { GarmentPreview } from "@/components/GarmentPreview";
 
-export function ProductCard({ product }: { product: Product }) {
-  const [color, setColor] = useState(product.colors[0]);
+export function ProductCard({
+  product,
+  defaultColor,
+  view = "front",
+}: {
+  product: Product;
+  defaultColor?: string;
+  view?: keyof ProductViews;
+}) {
+  const [color, setColor] = useState(
+    product.colors.find((option) => option.name === defaultColor) ||
+      product.colors[0],
+  );
 
   return (
     <article className="group overflow-hidden rounded-md border border-white/10 bg-black/40">
       <Link href={`/shop/${product.slug}`} className="block">
         <GarmentPreview
-          image={imageFor(product, color.name)}
+          image={imageFor(product, color.name, view)}
           alt={product.name}
           color={color.hex}
           blendMode={product.blendMode}

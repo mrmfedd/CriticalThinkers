@@ -53,8 +53,13 @@ export default function HomePage() {
           </Link>
         </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {featured.map((product) => (
-            <ProductCard key={product.slug} product={product} />
+          {featured.map((product, index) => (
+            <ProductCard
+              key={product.slug}
+              product={product}
+              defaultColor={["Heather Grey", "Black", "White"][index % 3]}
+              view="back"
+            />
           ))}
         </div>
       </section>

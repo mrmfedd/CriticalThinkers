@@ -70,11 +70,13 @@ export const designTees: Product[] = [
     3,
     "CIA Memo Tee",
     "Conspiracy theory as a dismissal tactic. CIA memo 1035-960 on the back.",
+    true,
   ),
   tee(
     4,
     "George Soros Quote Tee",
     "A back-print quote attributed to George Soros, with the CriticalThinkers.us chest mark.",
+    true,
   ),
   tee(
     5,
@@ -86,6 +88,7 @@ export const designTees: Product[] = [
     6,
     "Kissinger Quote Tee",
     "Once the herd accepts it, they will accept anything. Kissinger on the back.",
+    true,
   ),
   tee(
     7,

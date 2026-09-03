@@ -56,7 +56,6 @@ export const products: Product[] = [
       { name: "Red", hex: "#b91c1c" },
       { name: "White", hex: "#f4f4f4" },
     ],
-    featured: true,
     blendMode: "multiply",
   },
   {
@@ -78,7 +77,6 @@ export const products: Product[] = [
       { name: "Ash", hex: "#d9d4cc" },
       { name: "Ice Blue", hex: "#c5d4e8" },
     ],
-    featured: true,
     blendMode: "color-burn",
   },
   {
@@ -100,7 +98,6 @@ export const products: Product[] = [
       { name: "Navy", hex: "#17233b" },
       { name: "Charcoal", hex: "#3a3f46" },
     ],
-    featured: true,
     blendMode: "multiply",
   },
   {
@@ -118,7 +115,6 @@ export const products: Product[] = [
       { name: "Navy", hex: "#1c2a44" },
       { name: "Red", hex: "#a3182d" },
     ],
-    featured: true,
     blendMode: "multiply",
   },
   {
@@ -170,7 +166,6 @@ export const products: Product[] = [
       { name: "Black", hex: "#111111" },
       { name: "Red", hex: "#b91c1c" },
     ],
-    featured: true,
     blendMode: "multiply",
   },
   {
@@ -218,7 +213,6 @@ export const products: Product[] = [
       { name: "Black", hex: "#151515" },
       { name: "White", hex: "#f5f5f5" },
     ],
-    featured: true,
     blendMode: "multiply",
   },
   {
