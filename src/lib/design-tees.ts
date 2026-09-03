@@ -140,4 +140,9 @@ export const designTees: Product[] = [
     "Best Defense Tee",
     "The best defense against propaganda is more propaganda. Bernays, over the news logos.",
   ),
+  tee(
+    17,
+    "Elon Musk Judiciary Tee",
+    "If any judge anywhere can block every presidential order everywhere, we do not have democracy. Elon Musk on the back.",
+  ),
 ];
