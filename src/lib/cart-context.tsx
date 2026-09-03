@@ -6,21 +6,13 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
-import { products, type ProductColor } from "@/lib/products";
+import type { CartItem } from "@/lib/cart-types";
 
-export type CartItem = {
-  id: string;
-  slug: string;
-  name: string;
-  image: string;
-  price: number;
-  quantity: number;
-  size: string;
-  color: ProductColor;
-};
+export type { CartItem };
 
 type CartContextValue = {
   items: CartItem[];
@@ -30,6 +22,7 @@ type CartContextValue = {
   clearCart: () => void;
   itemCount: number;
   subtotal: number;
+  databaseConnected: boolean;
 };
 
 const STORAGE_KEY = "ct-cart-v1";
@@ -39,30 +32,81 @@ function makeId(slug: string, size: string, color: string) {
   return `${slug}::${size}::${color}`;
 }
 
+function readLocalCart() {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as CartItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [ready, setReady] = useState(false);
+  const [databaseConnected, setDatabaseConnected] = useState(false);
+  const persistGeneration = useRef(0);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as CartItem[];
-        const valid = parsed.filter((item) =>
-          products.some((product) => product.slug === item.slug),
-        );
-        setItems(valid);
+    const local = readLocalCart();
+    let cancelled = false;
+
+    async function hydrate() {
+      try {
+        const response = await fetch("/api/cart");
+        const payload = (await response.json()) as {
+          items?: CartItem[];
+          connected?: boolean;
+        };
+        if (cancelled) return;
+        setDatabaseConnected(Boolean(payload.connected));
+        if (payload.connected && Array.isArray(payload.items) && payload.items.length) {
+          setItems(payload.items);
+        } else {
+          setItems(local);
+        }
+      } catch {
+        if (!cancelled) {
+          setDatabaseConnected(false);
+          setItems(local);
+        }
+      } finally {
+        if (!cancelled) setReady(true);
       }
-    } catch {
-      setItems([]);
-    } finally {
-      setReady(true);
     }
+
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
     if (!ready) return;
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    const generation = persistGeneration.current;
+    const timer = window.setTimeout(() => {
+      if (generation !== persistGeneration.current) return;
+      void fetch("/api/cart", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      })
+        .then(async (response) => {
+          const payload = (await response.json().catch(() => null)) as
+            | { connected?: boolean }
+            | null;
+          if (generation === persistGeneration.current) {
+            setDatabaseConnected(Boolean(payload?.connected));
+          }
+        })
+        .catch(() => {
+          if (generation === persistGeneration.current) {
+            setDatabaseConnected(false);
+          }
+        });
+    }, 400);
+    return () => window.clearTimeout(timer);
   }, [items, ready]);
 
   const addItem = useCallback(
@@ -73,7 +117,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         if (existing) {
           return current.map((entry) =>
             entry.id === id
-              ? { ...entry, quantity: entry.quantity + quantity }
+              ? { ...entry, quantity: Math.min(12, entry.quantity + quantity) }
               : entry,
           );
         }
@@ -95,7 +139,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((current) => current.filter((item) => item.id !== id));
   }, []);
 
-  const clearCart = useCallback(() => setItems([]), []);
+  const clearCart = useCallback(() => {
+    persistGeneration.current += 1;
+    setItems([]);
+  }, []);
 
   const value = useMemo<CartContextValue>(() => {
     const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -111,8 +158,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       clearCart,
       itemCount,
       subtotal,
+      databaseConnected,
     };
-  }, [items, addItem, updateQuantity, removeItem, clearCart]);
+  }, [items, addItem, updateQuantity, removeItem, clearCart, databaseConnected]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

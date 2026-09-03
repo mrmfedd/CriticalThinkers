@@ -23,7 +23,7 @@ type PayPalButtonsProps = {
   items: CartItem[];
   disabled?: boolean;
   validate?: () => void;
-  onPaid: (captureId: string) => void;
+  onPaid: (captureId: string) => void | Promise<void>;
   onError: (message: string) => void;
 };
 
@@ -100,7 +100,7 @@ export function PayPalButtons({
         if (!response.ok) {
           throw new Error(payload.error || "PayPal could not finish the payment.");
         }
-        onPaid(payload.captureId || payload.orderId || data.orderID);
+        await onPaid(payload.captureId || payload.orderId || data.orderID);
       },
       onError: (error) => {
         onError(error instanceof Error ? error.message : "PayPal checkout failed.");

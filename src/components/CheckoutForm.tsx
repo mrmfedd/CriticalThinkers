@@ -44,28 +44,57 @@ export function CheckoutForm({ paypal }: CheckoutFormProps) {
     return Object.fromEntries(data.entries());
   }, []);
 
+  const persistOrder = useCallback(
+    async (paidWith: "paypal" | "sample", captureId?: string) => {
+      const customer = collectCustomer();
+      window.sessionStorage.setItem(
+        "ct-last-order",
+        JSON.stringify({
+          customer,
+          items,
+          subtotal,
+          captureId,
+          paidWith,
+          placedAt: new Date().toISOString(),
+        }),
+      );
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer,
+          items,
+          paidWith,
+          paypalCaptureId: captureId,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      if (!response.ok) {
+        if (
+          response.status === 503 &&
+          /not connected/i.test(payload?.error || "")
+        ) {
+          return;
+        }
+        throw new Error(payload?.error || "Could not save this order.");
+      }
+    },
+    [collectCustomer, items, subtotal],
+  );
+
   const onPaid = useCallback(
-    (captureId: string) => {
+    async (captureId: string) => {
       try {
-        const customer = collectCustomer();
-        window.sessionStorage.setItem(
-          "ct-last-order",
-          JSON.stringify({
-            customer,
-            items,
-            subtotal,
-            captureId,
-            paidWith: "paypal",
-            placedAt: new Date().toISOString(),
-          }),
-        );
+        await persistOrder("paypal", captureId);
       } catch {
         // Payment already captured; still complete checkout.
       }
       clearCart();
       router.push(`/thank-you?paid=paypal&id=${encodeURIComponent(captureId)}`);
     },
-    [clearCart, collectCustomer, items, router, subtotal],
+    [clearCart, persistOrder, router],
   );
 
   if (items.length === 0) {
@@ -80,20 +109,10 @@ export function CheckoutForm({ paypal }: CheckoutFormProps) {
     );
   }
 
-  function onSampleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function onSampleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
-      const customer = collectCustomer();
-      window.sessionStorage.setItem(
-        "ct-last-order",
-        JSON.stringify({
-          customer,
-          items,
-          subtotal,
-          paidWith: "sample",
-          placedAt: new Date().toISOString(),
-        }),
-      );
+      await persistOrder("sample");
       clearCart();
       router.push("/thank-you");
     } catch (err) {

@@ -3,9 +3,11 @@ node_modules
 out
 .DS_Store
 *.log
+*.tsbuildinfo
 .env*
 !.env.example
 public/uploads/*
 !public/uploads/.gitkeep
 data/paypal.json
 data/orders.json
+data/supabase.json
