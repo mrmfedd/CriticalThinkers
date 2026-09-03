@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     template: `%s · ${site.name}`,
   },
   description:
-    "Make America Think Again. Apparel, drinkware, and gear from CriticalThinkers.us.",
+    "Make America Think Again. T-shirts and gear from CriticalThinkers.us.",
 };
 
 export const dynamic = "force-dynamic";
