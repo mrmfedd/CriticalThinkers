@@ -1,6 +1,6 @@
 import { designTees } from "@/lib/design-tees";
 
-export type ProductCategory = "T-shirts";
+export type ProductCategory = string;
 
 export type ProductColor = {
   name: string;
@@ -24,8 +24,18 @@ export type Product = {
   colors: ProductColor[];
   views?: Record<string, ProductViews>;
   featured?: boolean;
+  sortOrder?: number;
   blendMode?: "multiply" | "color-burn";
 };
+
+export function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
 
 export function imageFor(
   product: Product,

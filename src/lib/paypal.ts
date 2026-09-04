@@ -1,7 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { products } from "@/lib/products";
-import { site } from "@/lib/site";
+import { getCatalog, getSiteSettings } from "@/lib/cms";
 
 export type PayPalMode = "sandbox" | "live";
 
@@ -162,13 +161,14 @@ export function money(amount: number) {
   return (Math.round(amount * 100) / 100).toFixed(2);
 }
 
-export function pricedLines(items: CheckoutLine[]) {
+export async function pricedLines(items: CheckoutLine[]) {
   if (!items.length) {
     throw new Error("Your cart is empty.");
   }
 
+  const catalog = await getCatalog();
   return items.map((item) => {
-    const product = products.find((entry) => entry.slug === item.slug);
+    const product = catalog.find((entry) => entry.slug === item.slug);
     if (!product) {
       throw new Error(`Unknown product: ${item.slug}`);
     }
@@ -185,15 +185,17 @@ export function pricedLines(items: CheckoutLine[]) {
   });
 }
 
-export function orderTotal(items: CheckoutLine[]) {
-  return pricedLines(items).reduce((sum, line) => sum + line.lineTotal, 0);
+export async function orderTotal(items: CheckoutLine[]) {
+  const lines = await pricedLines(items);
+  return lines.reduce((sum, line) => sum + line.lineTotal, 0);
 }
 
 export async function createPayPalOrder(items: CheckoutLine[]) {
   const config = getPayPalConfig();
   const token = await paypalAccessToken(config);
-  const lines = pricedLines(items);
+  const lines = await pricedLines(items);
   const total = money(lines.reduce((sum, line) => sum + line.lineTotal, 0));
+  const settings = await getSiteSettings();
 
   const response = await fetch(`${apiBase(config.mode)}/v2/checkout/orders`, {
     method: "POST",
@@ -205,7 +207,7 @@ export async function createPayPalOrder(items: CheckoutLine[]) {
       intent: "CAPTURE",
       purchase_units: [
         {
-          description: `${site.name} order`,
+          description: `${settings.name} order`,
           amount: {
             currency_code: "USD",
             value: total,

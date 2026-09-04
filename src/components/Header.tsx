@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useCart } from "@/lib/cart-context";
-import { site } from "@/lib/site";
 
 const links = [
   { href: "/", label: "Home" },
@@ -13,7 +12,15 @@ const links = [
   { href: "/contact", label: "Contact" },
 ];
 
-export function Header({ logoSrc = "/brand/logo.jpg" }: { logoSrc?: string }) {
+export function Header({
+  logoSrc = "/brand/logo.jpg",
+  name,
+  tagline,
+}: {
+  logoSrc?: string;
+  name: string;
+  tagline: string;
+}) {
   const pathname = usePathname();
   const { itemCount } = useCart();
   const [open, setOpen] = useState(false);
@@ -24,11 +31,11 @@ export function Header({ logoSrc = "/brand/logo.jpg" }: { logoSrc?: string }) {
         <Link href="/" className="flex items-center gap-3" onClick={() => setOpen(false)}>
           <img
             src={logoSrc}
-            alt={site.name}
+            alt={name}
             className="h-12 w-auto rounded-sm border border-white/10 md:h-14"
           />
           <span className="hidden font-display text-sm tracking-[0.18em] text-white sm:block">
-            {site.tagline.toUpperCase()}
+            {tagline.toUpperCase()}
           </span>
         </Link>
 

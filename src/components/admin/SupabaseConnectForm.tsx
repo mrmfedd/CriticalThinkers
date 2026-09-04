@@ -1,5 +1,6 @@
 "use client";
 
+import type { CmsStatus } from "@/lib/cms";
 import { FormEvent, useState } from "react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 
@@ -20,10 +21,12 @@ type SupabaseAdminView = {
 export function SupabaseConnectForm({
   initial,
   initialProbe,
+  cms,
   schemaSql,
 }: {
   initial: SupabaseAdminView;
   initialProbe: Probe;
+  cms: CmsStatus;
   schemaSql: string;
 }) {
   const [status, setStatus] = useState(initial);
@@ -102,7 +105,7 @@ export function SupabaseConnectForm({
     <div className="mx-auto max-w-6xl px-4 py-8">
       <AdminHeader
         title="Database"
-        description="Connect the shopping cart and checkout orders to your Supabase project."
+        description="Connect Supabase so the website, products, cart, and orders are stored in the database instead of the code."
       />
 
       <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
@@ -114,6 +117,14 @@ export function SupabaseConnectForm({
             {probe.ok
               ? "Connected · carts and orders are live"
               : probe.error || "Not connected"}
+          </p>
+          <p className="text-sm text-steel">
+            Website CMS:{" "}
+            {cms.source === "postgres"
+              ? `tables live · ${cms.productCount} products`
+              : cms.source === "storage"
+                ? `saving to Storage until you run the SQL below · ${cms.productCount} products`
+                : cms.error || "using built-in fallback until Supabase is connected"}
           </p>
           {status.envLocked ? (
             <p className="text-sm text-steel">
@@ -210,7 +221,7 @@ export function SupabaseConnectForm({
               >
                 SQL editor
               </a>
-              , paste the cart schema, and run it once.
+              , paste the schema (carts, orders, website, and products), and run it once.
             </li>
           </ol>
           {schemaSql ? (

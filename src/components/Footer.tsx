@@ -1,7 +1,13 @@
 import Link from "next/link";
-import { site } from "@/lib/site";
+import type { PublicSite } from "@/lib/cms";
 
-export function Footer({ logoSrc = "/brand/logo.jpg" }: { logoSrc?: string }) {
+export function Footer({
+  logoSrc = "/brand/logo.jpg",
+  site,
+}: {
+  logoSrc?: string;
+  site: PublicSite;
+}) {
   return (
     <footer className="mt-16 border-t border-white/10 bg-black/50">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 md:grid-cols-3">
@@ -11,9 +17,7 @@ export function Footer({ logoSrc = "/brand/logo.jpg" }: { logoSrc?: string }) {
             alt={site.name}
             className="mb-4 h-16 w-auto rounded-sm border border-white/10"
           />
-          <p className="max-w-sm text-sm leading-6 text-steel">
-            {site.tagline}. Gear for citizens who still ask the hard questions.
-          </p>
+          <p className="max-w-sm text-sm leading-6 text-steel">{site.footerBlurb}</p>
         </div>
         <div>
           <h2 className="font-display text-sm tracking-[0.2em] text-white uppercase">

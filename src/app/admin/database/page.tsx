@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { isAdmin } from "@/lib/admin-auth";
 import { AdminLoginForm } from "@/components/admin/AdminLoginForm";
 import { SupabaseConnectForm } from "@/components/admin/SupabaseConnectForm";
+import { probeCms } from "@/lib/cms";
 import { probeStore } from "@/lib/cart-store";
 import { getSupabaseAdminView } from "@/lib/supabase";
 import { readFileSync } from "node:fs";
@@ -31,6 +32,7 @@ export default async function AdminDatabasePage() {
     <SupabaseConnectForm
       initial={getSupabaseAdminView()}
       initialProbe={await probeStore()}
+      cms={await probeCms()}
       schemaSql={schemaSql()}
     />
   );

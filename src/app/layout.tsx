@@ -4,8 +4,7 @@ import { CartProvider } from "@/lib/cart-context";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { StorefrontChrome } from "@/components/StorefrontChrome";
-import { getBrandImages } from "@/lib/image-store";
-import { site } from "@/lib/site";
+import { getSiteSettings } from "@/lib/cms";
 import "./globals.css";
 
 const display = Oswald({
@@ -20,31 +19,39 @@ const body = IBM_Plex_Sans({
   weight: ["400", "500", "600"],
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: `${site.name} · ${site.tagline}`,
-    template: `%s · ${site.name}`,
-  },
-  description:
-    "Make America Think Again. T-shirts and gear from CriticalThinkers.us.",
-};
-
 export const dynamic = "force-dynamic";
 
-export default function RootLayout({
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettings();
+  return {
+    title: {
+      default: `${settings.name} · ${settings.tagline}`,
+      template: `%s · ${settings.name}`,
+    },
+    description: settings.metaDescription,
+  };
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const brand = getBrandImages();
+  const settings = await getSiteSettings();
 
   return (
     <html lang="en">
       <body className={`${display.variable} ${body.variable} font-body`}>
         <CartProvider>
           <StorefrontChrome
-            header={<Header logoSrc={brand.logo} />}
-            footer={<Footer logoSrc={brand.logo} />}
+            header={
+              <Header
+                logoSrc={settings.logoUrl}
+                name={settings.name}
+                tagline={settings.tagline}
+              />
+            }
+            footer={<Footer logoSrc={settings.logoUrl} site={settings} />}
           >
             {children}
           </StorefrontChrome>

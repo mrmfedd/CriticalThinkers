@@ -1,21 +1,20 @@
 import type { Metadata } from "next";
 import { isAdmin } from "@/lib/admin-auth";
 import { AdminLoginForm } from "@/components/admin/AdminLoginForm";
-import { SiteEditor } from "@/components/admin/SiteEditor";
-import { getSiteSettings, probeCms } from "@/lib/cms";
+import { ProductsList } from "@/components/admin/ProductsList";
+import { getCatalog } from "@/lib/cms";
 
 export const metadata: Metadata = {
-  title: "Website",
+  title: "Products",
   robots: { index: false, follow: false },
 };
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPage() {
+export default async function AdminProductsPage() {
   if (!(await isAdmin())) {
     return <AdminLoginForm />;
   }
 
-  const [settings, status] = await Promise.all([getSiteSettings(), probeCms()]);
-  return <SiteEditor initial={settings} source={status.source} />;
+  return <ProductsList products={await getCatalog()} />;
 }

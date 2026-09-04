@@ -1,6 +1,6 @@
-import { getCatalog } from "@/lib/image-store";
+import { getCatalog } from "@/lib/cms";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase";
-import { imageFor } from "@/lib/products";
+import { imageFor, type Product } from "@/lib/products";
 import type { ProductColor } from "@/lib/products";
 import type { CartItem, StoredOrder } from "@/lib/cart-types";
 
@@ -61,7 +61,7 @@ function colorOf(value: ProductColor | string): ProductColor {
   return value;
 }
 
-export function toCartItem(input: CartLineInput, product: ReturnType<typeof getCatalog>[number]): CartItem {
+export function toCartItem(input: CartLineInput, product: Product): CartItem {
   const color = colorOf(input.color);
   const matched =
     product.colors.find((option) => option.name === color.name) || product.colors[0];
@@ -79,9 +79,8 @@ export function toCartItem(input: CartLineInput, product: ReturnType<typeof getC
   };
 }
 
-export function normalizeCartItems(input: unknown): CartItem[] {
+export function normalizeCartItems(input: unknown, catalog: Product[]): CartItem[] {
   if (!Array.isArray(input)) return [];
-  const catalog = getCatalog();
   const merged = new Map<string, CartItem>();
   for (const entry of input) {
     if (!entry || typeof entry !== "object") continue;
@@ -157,7 +156,8 @@ export async function readCart(sessionId: string): Promise<CartItem[]> {
     .select("product_slug, name, image, unit_price, quantity, size, color_name, color_hex")
     .eq("cart_id", cart.id);
   throwIfStoreError(result.error);
-  return normalizeCartItems((result.data as CartItemRow[] | null)?.map(fromRow) ?? []);
+  const catalog = await getCatalog();
+  return normalizeCartItems((result.data as CartItemRow[] | null)?.map(fromRow) ?? [], catalog);
 }
 
 export async function writeCart(sessionId: string, items: unknown) {
@@ -170,7 +170,8 @@ export async function writeCart(sessionId: string, items: unknown) {
   const cart = await getOrCreateCart(sessionId);
   if (!cart) throw new Error("Could not create a cart.");
 
-  const normalized = normalizeCartItems(items);
+  const catalog = await getCatalog();
+  const normalized = normalizeCartItems(items, catalog);
   const cleared = await supabase.from("cart_items").delete().eq("cart_id", cart.id);
   throwIfStoreError(cleared.error);
 
@@ -249,7 +250,7 @@ export async function createOrder(options: {
 
   const cart = await getOrCreateCart(options.sessionId);
   const stored = cart ? await readCart(options.sessionId) : [];
-  const items = stored.length ? stored : normalizeCartItems(options.items ?? []);
+  const items = stored.length ? stored : normalizeCartItems(options.items ?? [], await getCatalog());
   if (!items.length) {
     throw new Error("Your cart is empty.");
   }

@@ -4,7 +4,6 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart-context";
 import { formatPrice } from "@/lib/products";
-import { site } from "@/lib/site";
 import { PayPalButtons } from "@/components/PayPalButtons";
 
 const requiredFields = [
@@ -23,9 +22,10 @@ type CheckoutFormProps = {
     clientId: string;
     mode: "sandbox" | "live";
   };
+  owner: string;
 };
 
-export function CheckoutForm({ paypal: initialPaypal }: CheckoutFormProps) {
+export function CheckoutForm({ paypal: initialPaypal, owner }: CheckoutFormProps) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const { items, subtotal, clearCart } = useCart();
@@ -150,7 +150,7 @@ export function CheckoutForm({ paypal: initialPaypal }: CheckoutFormProps) {
         <h1 className="font-display text-4xl text-white">Checkout</h1>
         <p className="text-sm text-steel">
           {paypal.connected
-            ? `Pay with PayPal. Funds go to ${site.owner}. ${
+            ? `Pay with PayPal. Funds go to ${owner}. ${
                 paypal.mode === "sandbox" ? "Sandbox mode is on." : ""
               }`
             : `PayPal is not connected yet. Connect it in Admin → PayPal, or place a sample order.`}

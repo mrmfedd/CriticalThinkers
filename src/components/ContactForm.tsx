@@ -1,22 +1,29 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { site } from "@/lib/site";
 
-export function ContactForm() {
+export function ContactForm({
+  owner,
+  email,
+  emailHref,
+}: {
+  owner: string;
+  email: string;
+  emailHref: string;
+}) {
   const [sent, setSent] = useState(false);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const name = String(form.get("name") || "");
-    const email = String(form.get("email") || "");
+    const senderEmail = String(form.get("email") || "");
     const message = String(form.get("message") || "");
     const body = encodeURIComponent(
-      `From: ${name} <${email}>\n\n${message}`,
+      `From: ${name} <${senderEmail}>\n\n${message}`,
     );
-    window.location.href = `${site.emailHref}?subject=${encodeURIComponent(
-      "CriticalThinkers.us inquiry",
+    window.location.href = `${emailHref}?subject=${encodeURIComponent(
+      "Store inquiry",
     )}&body=${body}`;
     setSent(true);
   }
@@ -24,7 +31,7 @@ export function ContactForm() {
   if (sent) {
     return (
       <p className="rounded-md border border-white/10 bg-black/30 p-6 text-steel">
-        Your email app should open a message to {site.owner} at {site.email}. If
+        Your email app should open a message to {owner} at {email}. If
         it does not, write him directly.
       </p>
     );
@@ -62,7 +69,7 @@ export function ContactForm() {
         type="submit"
         className="rounded bg-flagRed px-6 py-3 font-display tracking-[0.16em] text-white uppercase"
       >
-        Email {site.owner}
+        Email {owner}
       </button>
     </form>
   );

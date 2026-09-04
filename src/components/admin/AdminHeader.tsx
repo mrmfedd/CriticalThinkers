@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
-  { href: "/admin", label: "Images" },
+  { href: "/admin", label: "Website" },
+  { href: "/admin/products", label: "Products" },
   { href: "/admin/paypal", label: "PayPal" },
   { href: "/admin/database", label: "Database" },
   { href: "/admin/orders", label: "Orders" },
@@ -50,9 +51,12 @@ export function AdminHeader({
           </button>
         </div>
       </div>
-      <nav className="mt-6 flex gap-2">
+      <nav className="mt-6 flex flex-wrap gap-2">
         {links.map((link) => {
-          const active = pathname === link.href;
+          const active =
+            link.href === "/admin"
+              ? pathname === "/admin"
+              : pathname === link.href || pathname.startsWith(`${link.href}/`);
           return (
             <Link
               key={link.href}
