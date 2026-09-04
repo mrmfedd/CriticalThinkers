@@ -12,7 +12,7 @@ export function Footer({ logoSrc = "/brand/logo.jpg" }: { logoSrc?: string }) {
             className="mb-4 h-16 w-auto rounded-sm border border-white/10"
           />
           <p className="max-w-sm text-sm leading-6 text-steel">
-            {site.tagline}. T-shirts for people who still like a hard question.
+            {site.tagline}. Gear for citizens who still ask the hard questions.
           </p>
         </div>
         <div>
