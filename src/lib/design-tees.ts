@@ -145,4 +145,9 @@ export const designTees: Product[] = [
     "Elon Musk Judiciary Tee",
     "If any judge anywhere can block every presidential order everywhere, we do not have democracy. Elon Musk on the back.",
   ),
+  tee(
+    18,
+    "Make America Think Again Tee",
+    "CRITICAL THINKERS in block letters on the back, with Make America Think Again underneath.",
+  ),
 ];
