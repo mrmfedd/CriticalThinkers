@@ -10,7 +10,7 @@ export function ProductDetail({ product }: { product: Product }) {
   const { addItem } = useCart();
   const [size, setSize] = useState(product.sizes[0]);
   const [color, setColor] = useState(product.colors[0]);
-  const [view, setView] = useState<"front" | "back">("front");
+  const [view, setView] = useState<"front" | "back">("back");
   const [quantity, setQuantity] = useState(1);
   const [addedOpen, setAddedOpen] = useState(false);
   const preview = imageFor(product, color.name, view);
@@ -47,7 +47,7 @@ export function ProductDetail({ product }: { product: Product }) {
         />
         {product.views ? (
           <div className="mt-3 grid grid-cols-2 gap-2">
-            {(["front", "back"] as const).map((option) => {
+            {(["back", "front"] as const).map((option) => {
               const selected = option === view;
               return (
                 <button

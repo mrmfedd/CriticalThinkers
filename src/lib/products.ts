@@ -40,7 +40,7 @@ export function slugify(value: string) {
 export function imageFor(
   product: Product,
   colorName = product.colors[0]?.name,
-  view: keyof ProductViews = "front",
+  view: keyof ProductViews = "back",
 ) {
   return product.views?.[colorName]?.[view] || product.image;
 }

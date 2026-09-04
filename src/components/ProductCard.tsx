@@ -13,7 +13,7 @@ import { GarmentPreview } from "@/components/GarmentPreview";
 export function ProductCard({
   product,
   defaultColor,
-  view = "front",
+  view = "back",
 }: {
   product: Product;
   defaultColor?: string;
