@@ -189,7 +189,7 @@ export function PayPalConnectForm({ initial }: { initial: PayPalAdminView }) {
           </ol>
           <p className="mt-4">
             Money lands in the PayPal account that owns the app — typically{" "}
-            <span className="text-white">joe121407@gmail.com</span>.
+            <span className="text-white">joei21407@gmail.com</span>.
           </p>
         </aside>
       </div>
