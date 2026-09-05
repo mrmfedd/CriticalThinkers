@@ -37,6 +37,7 @@ create table if not exists public.orders (
   state text,
   zip text,
   subtotal numeric(10,2) not null default 0,
+  shipping numeric(10,2) not null default 0,
   status text not null default 'received',
   paid_with text not null default 'sample',
   paypal_order_id text,
@@ -113,6 +114,8 @@ create index if not exists cart_items_cart_id_idx on public.cart_items (cart_id)
 create index if not exists orders_created_at_idx on public.orders (created_at desc);
 create index if not exists order_items_order_id_idx on public.order_items (order_id);
 create index if not exists shop_products_sort_idx on public.shop_products (sort_order, name);
+
+alter table public.orders add column if not exists shipping numeric(10,2) not null default 0;
 
 alter table public.carts enable row level security;
 alter table public.cart_items enable row level security;

@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import type { CartItem } from "@/lib/cart-types";
+import { withShipping } from "@/lib/commerce";
 
 export type { CartItem };
 
@@ -22,10 +23,12 @@ type CartContextValue = {
   clearCart: () => void;
   itemCount: number;
   subtotal: number;
+  shipping: number;
+  total: number;
   databaseConnected: boolean;
 };
 
-const STORAGE_KEY = "ct-cart-v1";
+const STORAGE_KEY = "ct-cart-v2";
 const CartContext = createContext<CartContextValue | null>(null);
 
 function makeId(slug: string, size: string, color: string) {
@@ -150,6 +153,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       (sum, item) => sum + item.price * item.quantity,
       0,
     );
+    const totals = withShipping(subtotal, items.length > 0);
     return {
       items,
       addItem,
@@ -157,7 +161,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       removeItem,
       clearCart,
       itemCount,
-      subtotal,
+      subtotal: totals.subtotal,
+      shipping: totals.shipping,
+      total: totals.total,
       databaseConnected,
     };
   }, [items, addItem, updateQuantity, removeItem, clearCart, databaseConnected]);

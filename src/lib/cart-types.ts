@@ -29,6 +29,7 @@ export type StoredOrder = {
   state: string | null;
   zip: string | null;
   subtotal: number;
+  shipping?: number;
   status: string;
   paid_with: string;
   paypal_capture_id: string | null;

@@ -5,7 +5,7 @@ import { useCart } from "@/lib/cart-context";
 import { formatPrice } from "@/lib/products";
 
 export function CartView() {
-  const { items, updateQuantity, removeItem, subtotal } = useCart();
+  const { items, updateQuantity, removeItem, subtotal, shipping, total } = useCart();
 
   if (items.length === 0) {
     return (
@@ -72,11 +72,21 @@ export function CartView() {
       </div>
       <aside className="h-fit rounded-md border border-white/10 bg-black/40 p-6">
         <h2 className="font-display text-2xl text-white">Order summary</h2>
-        <div className="mt-4 flex justify-between text-steel">
-          <span>Subtotal</span>
-          <span className="text-white">{formatPrice(subtotal)}</span>
+        <div className="mt-4 grid gap-2 text-steel">
+          <div className="flex justify-between">
+            <span>Subtotal</span>
+            <span className="text-white">{formatPrice(subtotal)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Shipping</span>
+            <span className="text-white">{formatPrice(shipping)}</span>
+          </div>
         </div>
-        <p className="mt-2 text-sm text-steel">Shipping calculated at checkout.</p>
+        <p className="mt-2 text-sm text-steel">Flat rate shipping, $6.50 per order.</p>
+        <div className="mt-4 flex justify-between font-display text-xl text-white">
+          <span>Total</span>
+          <span>{formatPrice(total)}</span>
+        </div>
         <Link
           href="/checkout"
           prefetch={false}

@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { designTees } from "@/lib/design-tees";
 import { contactHrefs, site } from "@/lib/site";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase";
+import { TEE_PRICE, migrateLegacyTeePrices } from "@/lib/commerce";
 import { slugify, type Product, type ProductColor, type ProductViews } from "@/lib/products";
 
 export type SiteSettings = {
@@ -478,7 +479,12 @@ async function seedIfNeeded() {
       if (!settings) await writeSettingsToPostgres(defaultSiteSettings);
       if (products && products.length === 0) {
         const stored = await readJsonObject<Product[]>(PRODUCTS_OBJECT);
-        await writeProductsToPostgres(stored?.length ? stored : seedProducts());
+        await writeProductsToPostgres(
+          migrateLegacyTeePrices(stored?.length ? stored : seedProducts()),
+        );
+      } else if (products?.length) {
+        const migrated = migrateLegacyTeePrices(products);
+        if (migrated !== products) await writeProductsToPostgres(migrated);
       }
       if (!settings) {
         const stored = await readJsonObject<SiteSettings>(SETTINGS_OBJECT);
@@ -491,7 +497,12 @@ async function seedIfNeeded() {
     const settings = await readJsonObject<SiteSettings>(SETTINGS_OBJECT);
     const products = await readJsonObject<Product[]>(PRODUCTS_OBJECT);
     if (!settings) await writeJsonObject(SETTINGS_OBJECT, defaultSiteSettings);
-    if (!products) await writeJsonObject(PRODUCTS_OBJECT, seedProducts());
+    if (!products) {
+      await writeJsonObject(PRODUCTS_OBJECT, seedProducts());
+    } else {
+      const migrated = migrateLegacyTeePrices(products);
+      if (migrated !== products) await writeJsonObject(PRODUCTS_OBJECT, migrated);
+    }
   } catch (error) {
     seedAttempted = false;
     throw error;
@@ -533,10 +544,10 @@ async function loadCatalog(): Promise<Product[]> {
     await seedIfNeeded();
     if (await postgresAvailable()) {
       const products = await readProductsFromPostgres();
-      if (products?.length) return sortProducts(products);
+      if (products?.length) return sortProducts(migrateLegacyTeePrices(products));
     }
     const stored = await readJsonObject<Product[]>(PRODUCTS_OBJECT);
-    if (stored?.length) return sortProducts(stored.map((product, index) => ({
+    if (stored?.length) return sortProducts(migrateLegacyTeePrices(stored).map((product, index) => ({
       ...product,
       sortOrder: product.sortOrder ?? index,
     })));
@@ -579,7 +590,7 @@ export function emptyProduct(): Product {
   return {
     slug: "",
     name: "",
-    price: 32,
+    price: TEE_PRICE,
     category: "T-shirts",
     image: "",
     description: "",

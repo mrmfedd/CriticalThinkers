@@ -33,7 +33,11 @@ export async function POST(request: Request) {
       paypalCaptureId: body?.paypalCaptureId,
       paypalOrderId: body?.paypalOrderId,
     });
-    const response = NextResponse.json({ id: order.id, subtotal: order.subtotal });
+    const response = NextResponse.json({
+      id: order.id,
+      subtotal: order.subtotal,
+      shipping: order.shipping,
+    });
     setCartSessionCookie(response, sessionId);
     return response;
   } catch (error) {

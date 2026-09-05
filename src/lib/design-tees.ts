@@ -1,3 +1,4 @@
+import { TEE_PRICE } from "@/lib/commerce";
 import type { Product, ProductColor } from "@/lib/products";
 
 const teeColors: ProductColor[] = [
@@ -41,7 +42,7 @@ function tee(
   return {
     slug: `design-${id}-tee`,
     name,
-    price: 32,
+    price: TEE_PRICE,
     category: "T-shirts",
     image: colorViews["Heather Grey"].front,
     description,

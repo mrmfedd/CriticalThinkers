@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { getCatalog, getSiteSettings } from "@/lib/cms";
+import { withShipping } from "@/lib/commerce";
 
 export type PayPalMode = "sandbox" | "live";
 
@@ -187,14 +188,16 @@ export async function pricedLines(items: CheckoutLine[]) {
 
 export async function orderTotal(items: CheckoutLine[]) {
   const lines = await pricedLines(items);
-  return lines.reduce((sum, line) => sum + line.lineTotal, 0);
+  const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+  return withShipping(subtotal, lines.length > 0).total;
 }
 
 export async function createPayPalOrder(items: CheckoutLine[]) {
   const config = getPayPalConfig();
   const token = await paypalAccessToken(config);
   const lines = await pricedLines(items);
-  const total = money(lines.reduce((sum, line) => sum + line.lineTotal, 0));
+  const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+  const totals = withShipping(subtotal, lines.length > 0);
   const settings = await getSiteSettings();
 
   const response = await fetch(`${apiBase(config.mode)}/v2/checkout/orders`, {
@@ -210,9 +213,10 @@ export async function createPayPalOrder(items: CheckoutLine[]) {
           description: `${settings.name} order`,
           amount: {
             currency_code: "USD",
-            value: total,
+            value: money(totals.total),
             breakdown: {
-              item_total: { currency_code: "USD", value: total },
+              item_total: { currency_code: "USD", value: money(totals.subtotal) },
+              shipping: { currency_code: "USD", value: money(totals.shipping) },
             },
           },
           items: lines.map((line) => ({

@@ -72,7 +72,10 @@ export function OrdersPanel() {
               </div>
               <div className="text-right">
                 <p className="font-display text-2xl text-chrome">
-                  {formatPrice(order.subtotal)}
+                  {formatPrice(order.subtotal + (order.shipping ?? 0))}
+                </p>
+                <p className="mt-1 text-xs text-steel">
+                  {formatPrice(order.subtotal)} + {formatPrice(order.shipping ?? 0)} shipping
                 </p>
                 <p className="mt-1 text-xs tracking-[0.14em] text-steel uppercase">
                   {order.paid_with} · {order.status}

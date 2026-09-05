@@ -1,4 +1,5 @@
 import { getCatalog } from "@/lib/cms";
+import { withShipping } from "@/lib/commerce";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase";
 import { imageFor, type Product } from "@/lib/products";
 import type { ProductColor } from "@/lib/products";
@@ -256,9 +257,8 @@ export async function createOrder(options: {
   }
 
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const inserted = await supabase
-    .from("orders")
-    .insert({
+  const totals = withShipping(subtotal, items.length > 0);
+  const orderRow = {
       cart_id: cart?.id ?? null,
       customer_name: name,
       email,
@@ -267,14 +267,18 @@ export async function createOrder(options: {
       city: String(options.customer.city || "").trim() || null,
       state: String(options.customer.state || "").trim() || null,
       zip: String(options.customer.zip || "").trim() || null,
-      subtotal,
+      subtotal: totals.subtotal,
+      shipping: totals.shipping,
       status: options.paidWith === "paypal" ? "paid" : "sample",
       paid_with: options.paidWith,
       paypal_capture_id: options.paypalCaptureId || null,
       paypal_order_id: options.paypalOrderId || null,
-    })
-    .select("id")
-    .single();
+  };
+  let inserted = await supabase.from("orders").insert(orderRow).select("id").single();
+  if (inserted.error && /shipping/i.test(inserted.error.message || "")) {
+    const { shipping: _shipping, ...withoutShipping } = orderRow;
+    inserted = await supabase.from("orders").insert(withoutShipping).select("id").single();
+  }
   throwIfStoreError(inserted.error);
 
   const orderId = (inserted.data as { id: string }).id;
@@ -293,20 +297,29 @@ export async function createOrder(options: {
   );
   throwIfStoreError(lines.error);
   await clearCart(options.sessionId);
-  return { id: orderId, items, subtotal };
+  return { id: orderId, items, subtotal: totals.subtotal, shipping: totals.shipping };
 }
 
 export async function listOrders(limit = 50): Promise<StoredOrder[]> {
   const supabase = getSupabase();
   if (!supabase) return [];
 
-  const result = await supabase
+  const columns =
+    "id, customer_name, email, phone, address, city, state, zip, subtotal, shipping, status, paid_with, paypal_capture_id, created_at, order_items(name, quantity, size, color_name, unit_price)";
+  const fallbackColumns =
+    "id, customer_name, email, phone, address, city, state, zip, subtotal, status, paid_with, paypal_capture_id, created_at, order_items(name, quantity, size, color_name, unit_price)";
+  let result = await supabase
     .from("orders")
-    .select(
-      "id, customer_name, email, phone, address, city, state, zip, subtotal, status, paid_with, paypal_capture_id, created_at, order_items(name, quantity, size, color_name, unit_price)",
-    )
+    .select(columns)
     .order("created_at", { ascending: false })
     .limit(limit);
+  if (result.error && /shipping/i.test(result.error.message || "")) {
+    result = await supabase
+      .from("orders")
+      .select(fallbackColumns)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+  }
   throwIfStoreError(result.error);
 
   return ((result.data as Array<Record<string, unknown>> | null) ?? []).map((row) => ({
@@ -319,6 +332,7 @@ export async function listOrders(limit = 50): Promise<StoredOrder[]> {
     state: (row.state as string | null) ?? null,
     zip: (row.zip as string | null) ?? null,
     subtotal: Number(row.subtotal),
+    shipping: Number(row.shipping ?? 0),
     status: String(row.status),
     paid_with: String(row.paid_with),
     paypal_capture_id: (row.paypal_capture_id as string | null) ?? null,

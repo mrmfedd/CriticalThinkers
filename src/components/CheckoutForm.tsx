@@ -28,7 +28,7 @@ type CheckoutFormProps = {
 export function CheckoutForm({ paypal: initialPaypal, owner }: CheckoutFormProps) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
-  const { items, subtotal, clearCart } = useCart();
+  const { items, subtotal, shipping, total, clearCart } = useCart();
   const [paypal, setPaypal] = useState(initialPaypal);
   const [error, setError] = useState("");
 
@@ -73,6 +73,8 @@ export function CheckoutForm({ paypal: initialPaypal, owner }: CheckoutFormProps
           customer,
           items,
           subtotal,
+          shipping,
+          total,
           captureId,
           paidWith,
           placedAt: new Date().toISOString(),
@@ -101,7 +103,7 @@ export function CheckoutForm({ paypal: initialPaypal, owner }: CheckoutFormProps
         throw new Error(payload?.error || "Could not save this order.");
       }
     },
-    [collectCustomer, items, subtotal],
+    [collectCustomer, items, subtotal, shipping, total],
   );
 
   const onPaid = useCallback(
@@ -247,9 +249,19 @@ export function CheckoutForm({ paypal: initialPaypal, owner }: CheckoutFormProps
             </li>
           ))}
         </ul>
-        <div className="mt-6 flex justify-between font-display text-xl text-white">
+        <div className="mt-6 grid gap-2 text-steel">
+          <div className="flex justify-between text-sm">
+            <span>Subtotal</span>
+            <span className="text-white">{formatPrice(subtotal)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>Flat rate shipping</span>
+            <span className="text-white">{formatPrice(shipping)}</span>
+          </div>
+        </div>
+        <div className="mt-4 flex justify-between font-display text-xl text-white">
           <span>Total</span>
-          <span>{formatPrice(subtotal)}</span>
+          <span>{formatPrice(total)}</span>
         </div>
       </aside>
     </form>
