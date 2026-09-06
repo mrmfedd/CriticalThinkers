@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
+import { unauthorizedUnlessAdmin } from "@/lib/admin-auth";
 import { getProduct, saveProduct, saveSiteSettings, uploadCmsImage } from "@/lib/cms";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const denied = await unauthorizedUnlessAdmin();
+  if (denied) return denied;
+
   const form = await request.formData();
   const file = form.get("file");
   const folder = String(form.get("folder") || "uploads");
@@ -14,7 +18,13 @@ export async function POST(request: Request) {
   const view = String(form.get("view") || "front") === "back" ? "back" : "front";
 
   if (!(file instanceof File) || file.size === 0) {
-    return NextResponse.json({ error: "Choose an image to upload." }, { status: 400 });
+    return NextResponse.json(
+      {
+        error:
+          "The image did not arrive. Use a JPEG, PNG, or WebP under 8MB.",
+      },
+      { status: 400 },
+    );
   }
 
   try {

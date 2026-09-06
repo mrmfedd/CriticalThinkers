@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { unauthorizedUnlessAdmin } from "@/lib/admin-auth";
 import { saveUploadedImage } from "@/lib/image-store";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const denied = await unauthorizedUnlessAdmin();
+  if (denied) return denied;
   const form = await request.formData();
   const file = form.get("file");
   const kind = String(form.get("kind") || "");

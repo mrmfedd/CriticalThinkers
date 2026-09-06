@@ -728,7 +728,11 @@ export async function uploadCmsImage(options: {
   await ensureBuckets();
 
   const filename = `${safeSegment(name || "image")}-${Date.now()}.${ext}`;
-  const path = `${safeSegment(folder) || "uploads"}/${filename}`;
+  const path = `${folder
+    .split("/")
+    .map((segment) => safeSegment(segment))
+    .filter(Boolean)
+    .join("/") || "uploads"}/${filename}`;
   const bytes = Buffer.from(await file.arrayBuffer());
   const uploaded = await supabase.storage.from(MEDIA_BUCKET).upload(path, bytes, {
     contentType: file.type || `image/${ext}`,

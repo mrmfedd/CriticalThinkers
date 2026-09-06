@@ -102,25 +102,37 @@ export function SiteEditor({
     setUploading(kind);
     setError("");
     setMessage("");
-    const form = new FormData();
-    form.set("file", file);
-    form.set("folder", "brand");
-    form.set("name", kind);
-    form.set("apply", kind);
-    const response = await fetch("/api/admin/cms/upload", { method: "POST", body: form });
-    const payload = (await response.json()) as {
-      error?: string;
-      url?: string;
-      settings?: PublicSite;
-    };
-    setUploading(null);
-    if (!response.ok || !payload.url) {
-      setError(payload.error || "Could not upload that image.");
-      return;
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      form.set("folder", "brand");
+      form.set("name", kind);
+      form.set("apply", kind);
+      const response = await fetch("/api/admin/cms/upload", { method: "POST", body: form });
+      const text = await response.text();
+      let payload: { error?: string; url?: string; settings?: PublicSite } = {};
+      try {
+        payload = JSON.parse(text) as typeof payload;
+      } catch {
+        setError("Upload failed. Try a JPEG, PNG, or WebP under 8MB.");
+        return;
+      }
+      if (!response.ok || !payload.url) {
+        setError(payload.error || "Could not upload that image.");
+        return;
+      }
+      if (payload.settings) setSettings(payload.settings);
+      else setField(kind === "logo" ? "logoUrl" : "heroUrl", payload.url);
+      setMessage(`${kind === "logo" ? "Logo" : "Hero"} image updated.`);
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "Could not upload that image.",
+      );
+    } finally {
+      setUploading(null);
     }
-    if (payload.settings) setSettings(payload.settings);
-    else setField(kind === "logo" ? "logoUrl" : "heroUrl", payload.url);
-    setMessage(`${kind === "logo" ? "Logo" : "Hero"} image updated.`);
   }
 
   return (
@@ -147,7 +159,7 @@ export function SiteEditor({
               Replace logo
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/gif"
                 disabled={Boolean(uploading) || busy}
                 className="mt-2 block w-full text-sm"
                 onChange={(event) => {
@@ -177,7 +189,7 @@ export function SiteEditor({
               Replace hero
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/gif"
                 disabled={Boolean(uploading) || busy}
                 className="mt-2 block w-full text-sm"
                 onChange={(event) => {
@@ -197,6 +209,9 @@ export function SiteEditor({
             </label>
           </div>
         </section>
+
+        {error ? <p className="text-sm text-flagRed">{error}</p> : null}
+        {message ? <p className="text-sm text-chrome">{message}</p> : null}
 
         {groups.map((group) => (
           <section

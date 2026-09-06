@@ -13,5 +13,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/api/admin/:path*"],
+  matcher: ["/api/admin/((?!cms/upload$|images$).*)"],
 };
