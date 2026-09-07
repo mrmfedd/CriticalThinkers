@@ -1,8 +1,30 @@
 import { NextResponse } from "next/server";
 import { unauthorizedUnlessAdmin } from "@/lib/admin-auth";
 import { getProduct, saveProduct, saveSiteSettings, uploadCmsImage } from "@/lib/cms";
+import { slugify } from "@/lib/products";
 
 export const runtime = "nodejs";
+
+function folderFromForm(form: FormData) {
+  const partsRaw = String(form.get("folderParts") || "").trim();
+  if (partsRaw) {
+    try {
+      const parts = JSON.parse(partsRaw) as unknown;
+      if (Array.isArray(parts) && parts.length) {
+        return parts.map((part) => String(part || "").trim()).filter(Boolean).join("/");
+      }
+    } catch {
+      // Fall through to slug / folder fields.
+    }
+  }
+
+  const slug = slugify(String(form.get("slug") || ""));
+  if (slug) return `products/${slug}`;
+
+  // Last resort: accept a slash-separated folder string. Some hosts have mangled
+  // "/" in multipart text fields into "-", so prefer folderParts/slug above.
+  return String(form.get("folder") || "uploads");
+}
 
 export async function POST(request: Request) {
   const denied = await unauthorizedUnlessAdmin();
@@ -10,7 +32,7 @@ export async function POST(request: Request) {
 
   const form = await request.formData();
   const file = form.get("file");
-  const folder = String(form.get("folder") || "uploads");
+  const folder = folderFromForm(form);
   const name = String(form.get("name") || "image");
   const apply = String(form.get("apply") || "");
   const slug = String(form.get("slug") || "");

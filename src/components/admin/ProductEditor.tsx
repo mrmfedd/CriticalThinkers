@@ -25,6 +25,12 @@ export function ProductEditor({ initial, isNew = false }: ProductEditorProps) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    setProduct(initial);
+    setDetailsText(initial.details.join("\n"));
+    setSizesText(initial.sizes.join(", "));
+  }, [initial]);
+
   function update<K extends keyof Product>(key: K, value: Product[K]) {
     setProduct((current) => ({ ...current, [key]: value }));
   }
@@ -93,15 +99,19 @@ export function ProductEditor({ initial, isNew = false }: ProductEditorProps) {
     setMessage("");
     setUploading(slot);
     try {
+      const productSlug = product.slug || slugify(product.name) || "new";
       const form = new FormData();
       form.set("file", file);
-      form.set("folder", `products/${product.slug || slugify(product.name) || "new"}`);
+      form.set("folder", `products/${productSlug}`);
+      form.set("folderParts", JSON.stringify(["products", productSlug]));
       form.set("name", `${slugify(colorName) || "color"}-${view}`);
       if (!isNew && product.slug) {
         form.set("apply", "product");
         form.set("slug", product.slug);
         form.set("color", colorName);
         form.set("view", view);
+      } else if (productSlug && productSlug !== "new") {
+        form.set("slug", productSlug);
       }
       const response = await fetch("/api/admin/cms/upload", { method: "POST", body: form });
       const payload = (await readUploadPayload(response)) as {
