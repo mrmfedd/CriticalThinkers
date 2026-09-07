@@ -308,21 +308,29 @@ export async function listOrders(limit = 50): Promise<StoredOrder[]> {
     "id, customer_name, email, phone, address, city, state, zip, subtotal, shipping, status, paid_with, paypal_capture_id, created_at, order_items(name, quantity, size, color_name, unit_price)";
   const fallbackColumns =
     "id, customer_name, email, phone, address, city, state, zip, subtotal, status, paid_with, paypal_capture_id, created_at, order_items(name, quantity, size, color_name, unit_price)";
-  let result = await supabase
+
+  const primary = await supabase
     .from("orders")
     .select(columns)
     .order("created_at", { ascending: false })
     .limit(limit);
-  if (result.error && /shipping/i.test(result.error.message || "")) {
-    result = await supabase
+
+  let rows = primary.data as Array<Record<string, unknown>> | null;
+  let error = primary.error;
+
+  // Older databases may not have the shipping column yet.
+  if (error && /shipping/i.test(error.message || "")) {
+    const fallback = await supabase
       .from("orders")
       .select(fallbackColumns)
       .order("created_at", { ascending: false })
       .limit(limit);
+    rows = fallback.data as Array<Record<string, unknown>> | null;
+    error = fallback.error;
   }
-  throwIfStoreError(result.error);
+  throwIfStoreError(error);
 
-  return ((result.data as Array<Record<string, unknown>> | null) ?? []).map((row) => ({
+  return (rows ?? []).map((row) => ({
     id: String(row.id),
     customer_name: String(row.customer_name),
     email: String(row.email),
