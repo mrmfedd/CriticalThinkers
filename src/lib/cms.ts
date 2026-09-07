@@ -107,12 +107,36 @@ const CMS_BUCKET = "cms";
 const SETTINGS_OBJECT = "settings.json";
 const PRODUCTS_OBJECT = "products.json";
 const MEDIA_PUBLIC_URL_RE = /\/storage\/v1\/object\/public\/media\/(.+)$/i;
+const MEDIA_API_RE = /^\/api\/media\/(.+)$/i;
+/** Flat upload bug: products-design-2-tee/file → products/design-2-tee/file */
+const MANGLED_PRODUCTS_FOLDER_RE = /^products-([^/]+)(?:\/(.*))?$/i;
 
 let seedAttempted = false;
 
+/** Collapse mangled `products-{slug}/...` keys into `products/{slug}/...`. */
+export function normalizeMediaObjectPath(objectPath: string) {
+  const cleaned = decodeURIComponent(String(objectPath || "").replace(/^\/+/, "").split("?")[0]);
+  if (!cleaned) return cleaned;
+  const match = cleaned.match(MANGLED_PRODUCTS_FOLDER_RE);
+  if (!match) return cleaned;
+  const slug = match[1];
+  const rest = match[2] || "";
+  return rest ? `products/${slug}/${rest}` : `products/${slug}`;
+}
+
+export function mediaObjectPathFromUrl(url: string) {
+  const trimmed = String(url || "").trim();
+  if (!trimmed) return "";
+  const api = trimmed.match(MEDIA_API_RE);
+  if (api?.[1]) return normalizeMediaObjectPath(api[1]);
+  const pub = trimmed.match(MEDIA_PUBLIC_URL_RE);
+  if (pub?.[1]) return normalizeMediaObjectPath(pub[1]);
+  return "";
+}
+
 /** Same-origin URL that streams a media-bucket object through /api/media. */
 export function appMediaUrl(objectPath: string) {
-  const cleaned = objectPath.replace(/^\/+/, "");
+  const cleaned = normalizeMediaObjectPath(objectPath);
   return `/api/media/${cleaned
     .split("/")
     .filter(Boolean)
@@ -124,10 +148,12 @@ export function appMediaUrl(objectPath: string) {
 export function toAppMediaUrl(url: string) {
   const trimmed = String(url || "").trim();
   if (!trimmed) return trimmed;
-  if (trimmed.startsWith("/api/media/")) return trimmed;
-  const match = trimmed.match(MEDIA_PUBLIC_URL_RE);
-  if (!match?.[1]) return trimmed;
-  return appMediaUrl(decodeURIComponent(match[1].split("?")[0]));
+  const objectPath = mediaObjectPathFromUrl(trimmed);
+  if (objectPath) return appMediaUrl(objectPath);
+  if (trimmed.startsWith("/api/media/")) {
+    return appMediaUrl(trimmed.replace(/^\/api\/media\//, ""));
+  }
+  return trimmed;
 }
 
 export const defaultSiteSettings: SiteSettings = {
@@ -800,6 +826,114 @@ export async function uploadCmsImage(options: {
   // Prefer same-origin proxy URLs so product photos keep working even when the
   // Supabase public bucket URL is blocked, private, or otherwise unreachable.
   return appMediaUrl(path);
+}
+
+export type MediaFolderMigrationResult = {
+  moved: string[];
+  updatedProducts: string[];
+  skipped: string[];
+};
+
+/**
+ * Move flat `products-{slug}/...` objects into `products/{slug}/...` and rewrite
+ * product image URLs so only one folder layout remains.
+ */
+export async function migrateMangledProductMedia(): Promise<MediaFolderMigrationResult> {
+  if (!supabaseConfigured()) {
+    throw new Error("Connect Supabase in Admin → Database before migrating media.");
+  }
+  const client = getSupabase();
+  if (!client) throw new Error("Supabase is not connected.");
+  await ensureBuckets();
+
+  const moved: string[] = [];
+  const skipped: string[] = [];
+  const updatedProducts: string[] = [];
+
+  async function moveObject(from: string, to: string) {
+    if (!from || !to || from === to) return false;
+    const existing = await client.storage.from(MEDIA_BUCKET).download(to);
+    if (!existing.error && existing.data) {
+      await client.storage.from(MEDIA_BUCKET).remove([from]);
+      moved.push(`${from} -> ${to} (already present)`);
+      return true;
+    }
+    const downloaded = await client.storage.from(MEDIA_BUCKET).download(from);
+    if (downloaded.error || !downloaded.data) {
+      skipped.push(`${from} (missing)`);
+      return false;
+    }
+    const bytes = Buffer.from(await downloaded.data.arrayBuffer());
+    const uploaded = await client.storage.from(MEDIA_BUCKET).upload(to, bytes, {
+      contentType: downloaded.data.type || undefined,
+      upsert: true,
+    });
+    if (uploaded.error) throw new Error(uploaded.error.message);
+    await client.storage.from(MEDIA_BUCKET).remove([from]);
+    moved.push(`${from} -> ${to}`);
+    return true;
+  }
+
+  const root = await client.storage.from(MEDIA_BUCKET).list("", { limit: 1000 });
+  if (root.error) throw new Error(root.error.message);
+  for (const entry of root.data ?? []) {
+    const name = entry.name || "";
+    if (!/^products-/i.test(name) || name.includes("/")) continue;
+    const files = await client.storage.from(MEDIA_BUCKET).list(name, { limit: 1000 });
+    if (files.error) throw new Error(files.error.message);
+    for (const file of files.data ?? []) {
+      if (!file.name || file.name.endsWith("/")) continue;
+      const from = `${name}/${file.name}`;
+      const to = normalizeMediaObjectPath(from);
+      await moveObject(from, to);
+    }
+  }
+
+  const catalog = await loadCatalog();
+  const nextCatalog: Product[] = [];
+  for (const product of catalog) {
+    let changed = false;
+    const imagePath = mediaObjectPathFromUrl(product.image);
+    if (imagePath) {
+      const normalized = normalizeMediaObjectPath(imagePath);
+      if (normalized !== imagePath) await moveObject(imagePath, normalized);
+    }
+    const nextImage = toAppMediaUrl(product.image);
+    if (nextImage !== product.image) changed = true;
+
+    const nextViews: Record<string, ProductViews> = {};
+    for (const [color, view] of Object.entries(product.views ?? {})) {
+      for (const url of [view.front, view.back]) {
+        const path = mediaObjectPathFromUrl(url);
+        if (!path) continue;
+        const normalized = normalizeMediaObjectPath(path);
+        if (normalized !== path) await moveObject(path, normalized);
+      }
+      const front = toAppMediaUrl(view.front);
+      const back = toAppMediaUrl(view.back);
+      if (front !== view.front || back !== view.back) changed = true;
+      nextViews[color] = { front, back };
+    }
+
+    const nextProduct: Product = {
+      ...product,
+      image: nextImage,
+      views: Object.keys(nextViews).length ? nextViews : product.views,
+    };
+    if (changed) updatedProducts.push(product.slug);
+    nextCatalog.push(nextProduct);
+  }
+
+  if (updatedProducts.length) {
+    if (await postgresAvailable()) {
+      await writeProductsToPostgres(nextCatalog);
+    } else {
+      await writeJsonObject(PRODUCTS_OBJECT, nextCatalog);
+    }
+    revalidateStorefront(updatedProducts);
+  }
+
+  return { moved, updatedProducts, skipped };
 }
 
 export async function probeCms(): Promise<CmsStatus> {

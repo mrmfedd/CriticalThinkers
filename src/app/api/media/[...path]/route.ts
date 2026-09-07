@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { normalizeMediaObjectPath } from "@/lib/cms";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -24,12 +25,12 @@ export async function GET(
   }
 
   const { path: parts } = await context.params;
-  const objectPath = parts
+  const rawPath = parts
     .map((part) => decodeURIComponent(part))
     .join("/")
     .replace(/^\/+/, "");
 
-  if (!objectPath || objectPath.includes("..") || objectPath.includes("\\")) {
+  if (!rawPath || rawPath.includes("..") || rawPath.includes("\\")) {
     return NextResponse.json({ error: "Invalid media path." }, { status: 400 });
   }
 
@@ -38,7 +39,11 @@ export async function GET(
     return NextResponse.json({ error: "Media storage is not connected." }, { status: 503 });
   }
 
-  const downloaded = await supabase.storage.from(MEDIA_BUCKET).download(objectPath);
+  const normalizedPath = normalizeMediaObjectPath(rawPath);
+  let downloaded = await supabase.storage.from(MEDIA_BUCKET).download(normalizedPath);
+  if ((downloaded.error || !downloaded.data) && normalizedPath !== rawPath) {
+    downloaded = await supabase.storage.from(MEDIA_BUCKET).download(rawPath);
+  }
   if (downloaded.error || !downloaded.data) {
     return NextResponse.json(
       { error: downloaded.error?.message || "Media not found." },
@@ -49,7 +54,7 @@ export async function GET(
   const bytes = Buffer.from(await downloaded.data.arrayBuffer());
   return new NextResponse(bytes, {
     headers: {
-      "Content-Type": contentTypeFor(objectPath, downloaded.data.type),
+      "Content-Type": contentTypeFor(normalizedPath, downloaded.data.type),
       "Cache-Control": "public, max-age=31536000, immutable",
     },
   });
