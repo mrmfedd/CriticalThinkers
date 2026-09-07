@@ -2,7 +2,7 @@ import { cache } from "react";
 import { revalidatePath } from "next/cache";
 import { designTees } from "@/lib/design-tees";
 import { contactHrefs, site } from "@/lib/site";
-import { getSupabase, supabaseConfigured } from "@/lib/supabase";
+import { getSupabase, getSupabaseConfig, supabaseConfigured } from "@/lib/supabase";
 import { TEE_PRICE, migrateLegacyTeePrices } from "@/lib/commerce";
 import { slugify, type Product, type ProductColor, type ProductViews } from "@/lib/products";
 
@@ -134,7 +134,21 @@ export function mediaObjectPathFromUrl(url: string) {
   return "";
 }
 
-/** Same-origin URL that streams a media-bucket object through /api/media. */
+function supabaseMediaOrigin() {
+  return getSupabaseConfig().url.replace(/\/$/, "");
+}
+
+/** Absolute public Supabase URL for a media-bucket object. Works on any deploy. */
+export function publicMediaUrl(objectPath: string) {
+  const cleaned = normalizeMediaObjectPath(objectPath);
+  return `${supabaseMediaOrigin()}/storage/v1/object/public/${MEDIA_BUCKET}/${cleaned
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")}`;
+}
+
+/** Same-origin proxy URL (optional). Prefer publicMediaUrl for persisted product data. */
 export function appMediaUrl(objectPath: string) {
   const cleaned = normalizeMediaObjectPath(objectPath);
   return `/api/media/${cleaned
@@ -144,15 +158,16 @@ export function appMediaUrl(objectPath: string) {
     .join("/")}`;
 }
 
-/** Rewrite public Supabase media URLs to the same-origin proxy so images load reliably. */
+/**
+ * Normalize media URLs for persistence/display.
+ * Keep local /designs paths, convert /api/media and mangled public URLs to a
+ * stable public Supabase URL so production works even before /api/media ships.
+ */
 export function toAppMediaUrl(url: string) {
   const trimmed = String(url || "").trim();
   if (!trimmed) return trimmed;
   const objectPath = mediaObjectPathFromUrl(trimmed);
-  if (objectPath) return appMediaUrl(objectPath);
-  if (trimmed.startsWith("/api/media/")) {
-    return appMediaUrl(trimmed.replace(/^\/api\/media\//, ""));
-  }
+  if (objectPath) return publicMediaUrl(objectPath);
   return trimmed;
 }
 
@@ -823,9 +838,9 @@ export async function uploadCmsImage(options: {
     );
   }
 
-  // Prefer same-origin proxy URLs so product photos keep working even when the
-  // Supabase public bucket URL is blocked, private, or otherwise unreachable.
-  return appMediaUrl(path);
+  // Prefer absolute public URLs so product photos work on every deploy
+  // (including production before /api/media is shipped).
+  return publicMediaUrl(path);
 }
 
 export type MediaFolderMigrationResult = {
