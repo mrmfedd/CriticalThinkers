@@ -106,8 +106,29 @@ const MEDIA_BUCKET = "media";
 const CMS_BUCKET = "cms";
 const SETTINGS_OBJECT = "settings.json";
 const PRODUCTS_OBJECT = "products.json";
+const MEDIA_PUBLIC_URL_RE = /\/storage\/v1\/object\/public\/media\/(.+)$/i;
 
 let seedAttempted = false;
+
+/** Same-origin URL that streams a media-bucket object through /api/media. */
+export function appMediaUrl(objectPath: string) {
+  const cleaned = objectPath.replace(/^\/+/, "");
+  return `/api/media/${cleaned
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")}`;
+}
+
+/** Rewrite public Supabase media URLs to the same-origin proxy so images load reliably. */
+export function toAppMediaUrl(url: string) {
+  const trimmed = String(url || "").trim();
+  if (!trimmed) return trimmed;
+  if (trimmed.startsWith("/api/media/")) return trimmed;
+  const match = trimmed.match(MEDIA_PUBLIC_URL_RE);
+  if (!match?.[1]) return trimmed;
+  return appMediaUrl(decodeURIComponent(match[1].split("?")[0]));
+}
 
 export const defaultSiteSettings: SiteSettings = {
   name: site.name,
@@ -177,11 +198,19 @@ function asViews(value: unknown): Record<string, ProductViews> | undefined {
     if (!entry || typeof entry !== "object") continue;
     const row = entry as Partial<ProductViews>;
     views[key] = {
-      front: String(row.front || ""),
-      back: String(row.back || ""),
+      front: toAppMediaUrl(String(row.front || "")),
+      back: toAppMediaUrl(String(row.back || "")),
     };
   }
   return Object.keys(views).length ? views : undefined;
+}
+
+function normalizeProductMedia(product: Product): Product {
+  return {
+    ...product,
+    image: toAppMediaUrl(product.image || ""),
+    views: asViews(product.views) ?? product.views,
+  };
 }
 
 export function withContactLinks(settings: SiteSettings): PublicSite {
@@ -224,8 +253,8 @@ function normalizeSettings(input: Partial<SiteSettings> | null | undefined): Sit
     contactKicker: String(next.contactKicker ?? ""),
     contactHeading: String(next.contactHeading ?? ""),
     contactIntro: String(next.contactIntro ?? ""),
-    logoUrl: text(next.logoUrl, defaultSiteSettings.logoUrl),
-    heroUrl: text(next.heroUrl, defaultSiteSettings.heroUrl),
+    logoUrl: toAppMediaUrl(text(next.logoUrl, defaultSiteSettings.logoUrl)),
+    heroUrl: toAppMediaUrl(text(next.heroUrl, defaultSiteSettings.heroUrl)),
     metaDescription: String(next.metaDescription ?? ""),
   };
 }
@@ -310,7 +339,7 @@ function productFromRow(row: ShopProductRow, index = 0): Product {
     sizes: asStringArray(row.sizes, ["S", "M", "L", "XL", "XXL"]),
     colors: colors.length ? colors : [{ name: "Black", hex: "#111111" }],
     views: asViews(row.views),
-    image: row.image || "",
+    image: toAppMediaUrl(row.image || ""),
     featured: Boolean(row.featured),
     sortOrder: Number(row.sort_order ?? index),
     blendMode:
@@ -370,6 +399,16 @@ async function ensureBuckets() {
     });
     if (created.error && !/exist|duplicate/i.test(created.error.message)) {
       throw new Error(created.error.message);
+    }
+  } else {
+    // Bucket may have been created private earlier; keep public so direct URLs work too.
+    const updated = await supabase.storage.updateBucket(MEDIA_BUCKET, {
+      public: true,
+      fileSizeLimit: 8 * 1024 * 1024,
+    });
+    if (updated.error && !/not allowed|policy|permission/i.test(updated.error.message)) {
+      // Non-fatal: uploads still work through the /api/media proxy.
+      console.warn("Could not mark media bucket public:", updated.error.message);
     }
   }
   if (!names.has(CMS_BUCKET)) {
@@ -547,10 +586,16 @@ async function loadCatalog(): Promise<Product[]> {
       if (products?.length) return sortProducts(migrateLegacyTeePrices(products));
     }
     const stored = await readJsonObject<Product[]>(PRODUCTS_OBJECT);
-    if (stored?.length) return sortProducts(migrateLegacyTeePrices(stored).map((product, index) => ({
-      ...product,
-      sortOrder: product.sortOrder ?? index,
-    })));
+    if (stored?.length) {
+      return sortProducts(
+        migrateLegacyTeePrices(stored).map((product, index) =>
+          normalizeProductMedia({
+            ...product,
+            sortOrder: product.sortOrder ?? index,
+          }),
+        ),
+      );
+    }
   } catch {
     // Fall back to the built-in catalog so the shop still renders.
   }
@@ -621,8 +666,9 @@ function sanitizeProduct(input: Partial<Product>, previous?: Product | null): Pr
   const sizes = asStringArray(input.sizes, previous?.sizes).map((size) => size.trim()).filter(Boolean);
   if (!sizes.length) throw new Error("Add at least one size.");
   const views = asViews(input.views) || previous?.views;
-  const image =
-    String(input.image || previous?.image || views?.[colors[0].name]?.front || "").trim();
+  const image = toAppMediaUrl(
+    String(input.image || previous?.image || views?.[colors[0].name]?.front || "").trim(),
+  );
   return {
     slug,
     name,
@@ -734,13 +780,26 @@ export async function uploadCmsImage(options: {
     .filter(Boolean)
     .join("/") || "uploads"}/${filename}`;
   const bytes = Buffer.from(await file.arrayBuffer());
+  if (!bytes.length) {
+    throw new Error("The image did not arrive. Use a JPEG, PNG, or WebP under 8MB.");
+  }
   const uploaded = await supabase.storage.from(MEDIA_BUCKET).upload(path, bytes, {
     contentType: file.type || `image/${ext}`,
     upsert: true,
   });
   if (uploaded.error) throw new Error(uploaded.error.message);
-  const { data } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+
+  const verified = await supabase.storage.from(MEDIA_BUCKET).download(path);
+  if (verified.error || !verified.data) {
+    throw new Error(
+      verified.error?.message ||
+        "Upload finished but the file could not be read back from storage.",
+    );
+  }
+
+  // Prefer same-origin proxy URLs so product photos keep working even when the
+  // Supabase public bucket URL is blocked, private, or otherwise unreachable.
+  return appMediaUrl(path);
 }
 
 export async function probeCms(): Promise<CmsStatus> {

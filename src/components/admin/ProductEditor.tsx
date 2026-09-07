@@ -418,12 +418,6 @@ async function readUploadPayload(response: Response) {
   }
 }
 
-function previewSrc(url: string, bust: number) {
-  if (!url || bust <= 0) return url;
-  const separator = url.includes("?") ? "&" : "?";
-  return `${url}${separator}v=${bust}`;
-}
-
 function PhotoSlot({
   colorName,
   view,
@@ -442,6 +436,7 @@ function PhotoSlot({
   const inputRef = useRef<HTMLInputElement>(null);
   const [localPreview, setLocalPreview] = useState("");
   const [cacheBust, setCacheBust] = useState(0);
+  const [broken, setBroken] = useState(false);
 
   useEffect(() => {
     setLocalPreview((current) => {
@@ -449,6 +444,7 @@ function PhotoSlot({
       return "";
     });
     setCacheBust(0);
+    setBroken(false);
   }, [url]);
 
   useEffect(() => {
@@ -460,6 +456,7 @@ function PhotoSlot({
   function takeFile(fileList: FileList | null) {
     const file = fileList?.[0];
     if (!file) return;
+    setBroken(false);
     setLocalPreview((current) => {
       if (current.startsWith("blob:")) URL.revokeObjectURL(current);
       return URL.createObjectURL(file);
@@ -468,6 +465,7 @@ function PhotoSlot({
   }
 
   function handleUrlChange(next: string) {
+    setBroken(false);
     if (next === url && next) {
       setCacheBust((value) => value + 1);
       return;
@@ -475,7 +473,7 @@ function PhotoSlot({
     onUrlChange(next);
   }
 
-  const displayUrl = localPreview || previewSrc(url, cacheBust);
+  const displayUrl = localPreview || url;
 
   return (
     <div className="grid gap-2 text-sm">
@@ -492,16 +490,21 @@ function PhotoSlot({
         }}
         className="relative block overflow-hidden rounded-sm border border-white/10 bg-black disabled:opacity-60"
       >
-        {displayUrl ? (
+        {displayUrl && !broken ? (
           <img
-            key={displayUrl}
+            key={`${displayUrl}::${cacheBust}`}
             src={displayUrl}
             alt={`${colorName} ${view}`}
             className="h-28 w-full object-cover"
+            onError={() => {
+              if (!localPreview) setBroken(true);
+            }}
           />
         ) : (
-          <span className="grid h-28 place-items-center text-xs text-steel">
-            Drop a photo or click to upload
+          <span className="grid h-28 place-items-center px-3 text-center text-xs text-steel">
+            {broken
+              ? "Image URL could not be loaded. Replace the photo or paste a working URL."
+              : "Drop a photo or click to upload"}
           </span>
         )}
         {busy ? (
@@ -514,14 +517,20 @@ function PhotoSlot({
         Image URL
         <input
           value={url}
+          title={url}
           onChange={(event) => handleUrlChange(event.target.value)}
           onBlur={() => {
             if (url && !localPreview) setCacheBust((value) => value + 1);
           }}
-          placeholder="https://… or /designs/…"
-          className={inputClass}
+          placeholder="https://… or /designs/… or /api/media/…"
+          className={`${inputClass} font-mono text-xs`}
         />
       </label>
+      {broken ? (
+        <p className="text-xs text-flagRed">
+          That URL is not reachable. Use Replace photo to upload again.
+        </p>
+      ) : null}
       <input
         ref={inputRef}
         type="file"
