@@ -15,7 +15,7 @@ export function GarmentPreview({
 }: GarmentPreviewProps) {
   return (
     <div className={`relative aspect-square overflow-hidden bg-black ${className}`}>
-      <img src={image} alt={alt} className="h-full w-full object-cover" />
+      <img key={image} src={image} alt={alt} className="h-full w-full object-cover" />
       {blendMode ? (
         <div
           aria-hidden

@@ -1,15 +1,43 @@
 "use client";
 
-import { useActionState } from "react";
-import { loginAdmin } from "@/app/admin/actions";
+import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export function AdminLoginForm() {
-  const [state, action, pending] = useActionState(loginAdmin, null);
+  const router = useRouter();
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending(true);
+    setError("");
+    const form = new FormData(event.currentTarget);
+    const password = String(form.get("password") || "");
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const payload = (await response.json()) as { error?: string; ok?: boolean };
+      if (!response.ok || !payload.ok) {
+        setError(payload.error || "That password did not match. Use ThinkAgain2026");
+        setPending(false);
+        return;
+      }
+      router.replace("/admin");
+      router.refresh();
+    } catch {
+      setError("Could not sign in. Try again.");
+      setPending(false);
+    }
+  }
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md items-center px-4">
       <form
-        action={action}
+        onSubmit={(event) => void onSubmit(event)}
         className="w-full rounded-md border border-white/10 bg-black/40 p-8"
       >
         <p className="text-xs tracking-[0.22em] text-flagRed uppercase">
@@ -33,9 +61,7 @@ export function AdminLoginForm() {
         <p className="mt-2 text-xs text-steel">
           Password: <span className="text-white">ThinkAgain2026</span>
         </p>
-        {state?.error ? (
-          <p className="mt-3 text-sm text-flagRed">{state.error}</p>
-        ) : null}
+        {error ? <p className="mt-3 text-sm text-flagRed">{error}</p> : null}
         <button
           type="submit"
           disabled={pending}

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import type { Product, ProductColor, ProductViews } from "@/lib/products";
@@ -25,17 +25,56 @@ export function ProductEditor({ initial, isNew = false }: ProductEditorProps) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    setProduct(initial);
+    setDetailsText(initial.details.join("\n"));
+    setSizesText(initial.sizes.join(", "));
+  }, [initial]);
+
   function update<K extends keyof Product>(key: K, value: Product[K]) {
     setProduct((current) => ({ ...current, [key]: value }));
   }
 
   function setColor(index: number, patch: Partial<ProductColor>) {
-    setProduct((current) => ({
-      ...current,
-      colors: current.colors.map((color, colorIndex) =>
+    setProduct((current) => {
+      const previous = current.colors[index];
+      if (!previous) return current;
+      const nextColors = current.colors.map((color, colorIndex) =>
         colorIndex === index ? { ...color, ...patch } : color,
-      ),
-    }));
+      );
+      const nextName = patch.name;
+      if (nextName === undefined || nextName === previous.name) {
+        return { ...current, colors: nextColors };
+      }
+
+      const views = { ...(current.views ?? {}) };
+      if (previous.name in views) {
+        views[nextName] = views[previous.name];
+        delete views[previous.name];
+      }
+
+      return {
+        ...current,
+        colors: nextColors,
+        views: Object.keys(views).length ? views : current.views,
+      };
+    });
+  }
+
+  function removeColor(index: number) {
+    setProduct((current) => {
+      const removed = current.colors[index];
+      const nextColors = current.colors.filter((_, colorIndex) => colorIndex !== index);
+      if (!removed) return { ...current, colors: nextColors };
+
+      const views = { ...(current.views ?? {}) };
+      delete views[removed.name];
+      return {
+        ...current,
+        colors: nextColors,
+        views: Object.keys(views).length ? views : undefined,
+      };
+    });
   }
 
   function setView(colorName: string, view: keyof ProductViews, url: string) {
@@ -60,15 +99,19 @@ export function ProductEditor({ initial, isNew = false }: ProductEditorProps) {
     setMessage("");
     setUploading(slot);
     try {
+      const productSlug = product.slug || slugify(product.name) || "new";
       const form = new FormData();
       form.set("file", file);
-      form.set("folder", `products/${product.slug || slugify(product.name) || "new"}`);
+      form.set("folder", `products/${productSlug}`);
+      form.set("folderParts", JSON.stringify(["products", productSlug]));
       form.set("name", `${slugify(colorName) || "color"}-${view}`);
       if (!isNew && product.slug) {
         form.set("apply", "product");
         form.set("slug", product.slug);
         form.set("color", colorName);
         form.set("view", view);
+      } else if (productSlug && productSlug !== "new") {
+        form.set("slug", productSlug);
       }
       const response = await fetch("/api/admin/cms/upload", { method: "POST", body: form });
       const payload = (await readUploadPayload(response)) as {
@@ -80,14 +123,26 @@ export function ProductEditor({ initial, isNew = false }: ProductEditorProps) {
         setError(payload.error || "Could not upload that image.");
         return;
       }
+      const uploadedUrl = payload.url;
       if (payload.product) {
-        setProduct((current) => ({
-          ...current,
-          views: payload.product?.views ?? current.views,
-          image: payload.product?.image ?? current.image,
-        }));
+        setProduct((current) => {
+          const views = { ...(payload.product?.views ?? current.views ?? {}) };
+          const slotViews = views[colorName] ?? {
+            front: current.views?.[colorName]?.front || current.image || "",
+            back: current.views?.[colorName]?.back || "",
+          };
+          views[colorName] = { ...slotViews, [view]: uploadedUrl };
+          return {
+            ...current,
+            views,
+            image:
+              view === "front" && current.colors[0]?.name === colorName
+                ? uploadedUrl
+                : (payload.product?.image ?? current.image),
+          };
+        });
       } else {
-        setView(colorName, view, payload.url);
+        setView(colorName, view, uploadedUrl);
       }
       setMessage(
         isNew
@@ -313,12 +368,7 @@ export function ProductEditor({ initial, isNew = false }: ProductEditorProps) {
                     </label>
                     <button
                       type="button"
-                      onClick={() =>
-                        update(
-                          "colors",
-                          product.colors.filter((_, colorIndex) => colorIndex !== index),
-                        )
-                      }
+                      onClick={() => removeColor(index)}
                       className="text-left text-xs text-flagRed"
                     >
                       Remove color
@@ -394,11 +444,46 @@ function PhotoSlot({
   onFile: (file: File) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [localPreview, setLocalPreview] = useState("");
+  const [cacheBust, setCacheBust] = useState(0);
+  const [broken, setBroken] = useState(false);
+
+  useEffect(() => {
+    setLocalPreview((current) => {
+      if (current.startsWith("blob:")) URL.revokeObjectURL(current);
+      return "";
+    });
+    setCacheBust(0);
+    setBroken(false);
+  }, [url]);
+
+  useEffect(() => {
+    return () => {
+      if (localPreview.startsWith("blob:")) URL.revokeObjectURL(localPreview);
+    };
+  }, [localPreview]);
 
   function takeFile(fileList: FileList | null) {
     const file = fileList?.[0];
-    if (file) onFile(file);
+    if (!file) return;
+    setBroken(false);
+    setLocalPreview((current) => {
+      if (current.startsWith("blob:")) URL.revokeObjectURL(current);
+      return URL.createObjectURL(file);
+    });
+    onFile(file);
   }
+
+  function handleUrlChange(next: string) {
+    setBroken(false);
+    if (next === url && next) {
+      setCacheBust((value) => value + 1);
+      return;
+    }
+    onUrlChange(next);
+  }
+
+  const displayUrl = localPreview || url;
 
   return (
     <div className="grid gap-2 text-sm">
@@ -415,15 +500,21 @@ function PhotoSlot({
         }}
         className="relative block overflow-hidden rounded-sm border border-white/10 bg-black disabled:opacity-60"
       >
-        {url ? (
+        {displayUrl && !broken ? (
           <img
-            src={url}
+            key={`${displayUrl}::${cacheBust}`}
+            src={displayUrl}
             alt={`${colorName} ${view}`}
             className="h-28 w-full object-cover"
+            onError={() => {
+              if (!localPreview) setBroken(true);
+            }}
           />
         ) : (
-          <span className="grid h-28 place-items-center text-xs text-steel">
-            Drop a photo or click to upload
+          <span className="grid h-28 place-items-center px-3 text-center text-xs text-steel">
+            {broken
+              ? "Image URL could not be loaded. Replace the photo or paste a working URL."
+              : "Drop a photo or click to upload"}
           </span>
         )}
         {busy ? (
@@ -436,11 +527,20 @@ function PhotoSlot({
         Image URL
         <input
           value={url}
-          onChange={(event) => onUrlChange(event.target.value)}
-          placeholder="https://… or /designs/…"
-          className={inputClass}
+          title={url}
+          onChange={(event) => handleUrlChange(event.target.value)}
+          onBlur={() => {
+            if (url && !localPreview) setCacheBust((value) => value + 1);
+          }}
+          placeholder="https://… or /designs/… or /api/media/…"
+          className={`${inputClass} font-mono text-xs`}
         />
       </label>
+      {broken ? (
+        <p className="text-xs text-flagRed">
+          That URL is not reachable. Use Replace photo to upload again.
+        </p>
+      ) : null}
       <input
         ref={inputRef}
         type="file"
