@@ -842,44 +842,46 @@ export async function migrateMangledProductMedia(): Promise<MediaFolderMigration
   if (!supabaseConfigured()) {
     throw new Error("Connect Supabase in Admin → Database before migrating media.");
   }
-  const client = getSupabase();
-  if (!client) throw new Error("Supabase is not connected.");
+  const maybeClient = getSupabase();
+  if (!maybeClient) throw new Error("Supabase is not connected.");
+  const client = maybeClient;
   await ensureBuckets();
 
   const moved: string[] = [];
   const skipped: string[] = [];
   const updatedProducts: string[] = [];
+  const bucket = client.storage.from(MEDIA_BUCKET);
 
   async function moveObject(from: string, to: string) {
     if (!from || !to || from === to) return false;
-    const existing = await client.storage.from(MEDIA_BUCKET).download(to);
+    const existing = await bucket.download(to);
     if (!existing.error && existing.data) {
-      await client.storage.from(MEDIA_BUCKET).remove([from]);
+      await bucket.remove([from]);
       moved.push(`${from} -> ${to} (already present)`);
       return true;
     }
-    const downloaded = await client.storage.from(MEDIA_BUCKET).download(from);
+    const downloaded = await bucket.download(from);
     if (downloaded.error || !downloaded.data) {
       skipped.push(`${from} (missing)`);
       return false;
     }
     const bytes = Buffer.from(await downloaded.data.arrayBuffer());
-    const uploaded = await client.storage.from(MEDIA_BUCKET).upload(to, bytes, {
+    const uploaded = await bucket.upload(to, bytes, {
       contentType: downloaded.data.type || undefined,
       upsert: true,
     });
     if (uploaded.error) throw new Error(uploaded.error.message);
-    await client.storage.from(MEDIA_BUCKET).remove([from]);
+    await bucket.remove([from]);
     moved.push(`${from} -> ${to}`);
     return true;
   }
 
-  const root = await client.storage.from(MEDIA_BUCKET).list("", { limit: 1000 });
+  const root = await bucket.list("", { limit: 1000 });
   if (root.error) throw new Error(root.error.message);
   for (const entry of root.data ?? []) {
     const name = entry.name || "";
     if (!/^products-/i.test(name) || name.includes("/")) continue;
-    const files = await client.storage.from(MEDIA_BUCKET).list(name, { limit: 1000 });
+    const files = await bucket.list(name, { limit: 1000 });
     if (files.error) throw new Error(files.error.message);
     for (const file of files.data ?? []) {
       if (!file.name || file.name.endsWith("/")) continue;
