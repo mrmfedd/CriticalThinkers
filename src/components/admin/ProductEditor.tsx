@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import type { Product, ProductColor, ProductViews } from "@/lib/products";
@@ -30,12 +30,45 @@ export function ProductEditor({ initial, isNew = false }: ProductEditorProps) {
   }
 
   function setColor(index: number, patch: Partial<ProductColor>) {
-    setProduct((current) => ({
-      ...current,
-      colors: current.colors.map((color, colorIndex) =>
+    setProduct((current) => {
+      const previous = current.colors[index];
+      if (!previous) return current;
+      const nextColors = current.colors.map((color, colorIndex) =>
         colorIndex === index ? { ...color, ...patch } : color,
-      ),
-    }));
+      );
+      const nextName = patch.name;
+      if (nextName === undefined || nextName === previous.name) {
+        return { ...current, colors: nextColors };
+      }
+
+      const views = { ...(current.views ?? {}) };
+      if (previous.name in views) {
+        views[nextName] = views[previous.name];
+        delete views[previous.name];
+      }
+
+      return {
+        ...current,
+        colors: nextColors,
+        views: Object.keys(views).length ? views : current.views,
+      };
+    });
+  }
+
+  function removeColor(index: number) {
+    setProduct((current) => {
+      const removed = current.colors[index];
+      const nextColors = current.colors.filter((_, colorIndex) => colorIndex !== index);
+      if (!removed) return { ...current, colors: nextColors };
+
+      const views = { ...(current.views ?? {}) };
+      delete views[removed.name];
+      return {
+        ...current,
+        colors: nextColors,
+        views: Object.keys(views).length ? views : undefined,
+      };
+    });
   }
 
   function setView(colorName: string, view: keyof ProductViews, url: string) {
@@ -80,14 +113,26 @@ export function ProductEditor({ initial, isNew = false }: ProductEditorProps) {
         setError(payload.error || "Could not upload that image.");
         return;
       }
+      const uploadedUrl = payload.url;
       if (payload.product) {
-        setProduct((current) => ({
-          ...current,
-          views: payload.product?.views ?? current.views,
-          image: payload.product?.image ?? current.image,
-        }));
+        setProduct((current) => {
+          const views = { ...(payload.product?.views ?? current.views ?? {}) };
+          const slotViews = views[colorName] ?? {
+            front: current.views?.[colorName]?.front || current.image || "",
+            back: current.views?.[colorName]?.back || "",
+          };
+          views[colorName] = { ...slotViews, [view]: uploadedUrl };
+          return {
+            ...current,
+            views,
+            image:
+              view === "front" && current.colors[0]?.name === colorName
+                ? uploadedUrl
+                : (payload.product?.image ?? current.image),
+          };
+        });
       } else {
-        setView(colorName, view, payload.url);
+        setView(colorName, view, uploadedUrl);
       }
       setMessage(
         isNew
@@ -313,12 +358,7 @@ export function ProductEditor({ initial, isNew = false }: ProductEditorProps) {
                     </label>
                     <button
                       type="button"
-                      onClick={() =>
-                        update(
-                          "colors",
-                          product.colors.filter((_, colorIndex) => colorIndex !== index),
-                        )
-                      }
+                      onClick={() => removeColor(index)}
                       className="text-left text-xs text-flagRed"
                     >
                       Remove color
@@ -378,6 +418,12 @@ async function readUploadPayload(response: Response) {
   }
 }
 
+function previewSrc(url: string, bust: number) {
+  if (!url || bust <= 0) return url;
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}v=${bust}`;
+}
+
 function PhotoSlot({
   colorName,
   view,
@@ -394,11 +440,42 @@ function PhotoSlot({
   onFile: (file: File) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [localPreview, setLocalPreview] = useState("");
+  const [cacheBust, setCacheBust] = useState(0);
+
+  useEffect(() => {
+    setLocalPreview((current) => {
+      if (current.startsWith("blob:")) URL.revokeObjectURL(current);
+      return "";
+    });
+    setCacheBust(0);
+  }, [url]);
+
+  useEffect(() => {
+    return () => {
+      if (localPreview.startsWith("blob:")) URL.revokeObjectURL(localPreview);
+    };
+  }, [localPreview]);
 
   function takeFile(fileList: FileList | null) {
     const file = fileList?.[0];
-    if (file) onFile(file);
+    if (!file) return;
+    setLocalPreview((current) => {
+      if (current.startsWith("blob:")) URL.revokeObjectURL(current);
+      return URL.createObjectURL(file);
+    });
+    onFile(file);
   }
+
+  function handleUrlChange(next: string) {
+    if (next === url && next) {
+      setCacheBust((value) => value + 1);
+      return;
+    }
+    onUrlChange(next);
+  }
+
+  const displayUrl = localPreview || previewSrc(url, cacheBust);
 
   return (
     <div className="grid gap-2 text-sm">
@@ -415,9 +492,10 @@ function PhotoSlot({
         }}
         className="relative block overflow-hidden rounded-sm border border-white/10 bg-black disabled:opacity-60"
       >
-        {url ? (
+        {displayUrl ? (
           <img
-            src={url}
+            key={displayUrl}
+            src={displayUrl}
             alt={`${colorName} ${view}`}
             className="h-28 w-full object-cover"
           />
@@ -436,7 +514,10 @@ function PhotoSlot({
         Image URL
         <input
           value={url}
-          onChange={(event) => onUrlChange(event.target.value)}
+          onChange={(event) => handleUrlChange(event.target.value)}
+          onBlur={() => {
+            if (url && !localPreview) setCacheBust((value) => value + 1);
+          }}
           placeholder="https://… or /designs/…"
           className={inputClass}
         />
