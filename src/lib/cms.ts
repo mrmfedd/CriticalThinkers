@@ -926,13 +926,15 @@ export async function migrateMangledProductMedia(): Promise<MediaFolderMigration
     nextCatalog.push(nextProduct);
   }
 
-  if (updatedProducts.length) {
+  if (moved.length || updatedProducts.length) {
     if (await postgresAvailable()) {
       await writeProductsToPostgres(nextCatalog);
     } else {
       await writeJsonObject(PRODUCTS_OBJECT, nextCatalog);
     }
-    revalidateStorefront(updatedProducts);
+    revalidateStorefront(
+      updatedProducts.length ? updatedProducts : nextCatalog.map((product) => product.slug),
+    );
   }
 
   return { moved, updatedProducts, skipped };
