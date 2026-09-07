@@ -86,6 +86,7 @@ type SiteSettingsRow = {
 };
 
 type ShopProductRow = {
+  id?: string;
   slug: string;
   name: string;
   price: number | string;
@@ -99,6 +100,7 @@ type ShopProductRow = {
   featured: boolean;
   sort_order: number;
   blend_mode: string | null;
+  updated_at?: string;
 };
 
 const SETTINGS_ID = "main";
@@ -358,6 +360,51 @@ function isMissingObject(error: { message?: string; statusCode?: string } | null
   return /not found|does not exist|No such file/i.test(message);
 }
 
+function asWriteError(error: { message?: string } | null, fallback: string) {
+  const message = error?.message || fallback;
+  if (/row-level security|permission denied|rls/i.test(message)) {
+    return `${message} Add the Supabase service role key in Admin → Database so product photos can be saved.`;
+  }
+  if (/no unique or exclusion constraint matching the ON CONFLICT/i.test(message)) {
+    return `${message} Re-run supabase/schema.sql so shop_products.slug is unique.`;
+  }
+  return message;
+}
+
+function isMissingRelation(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return (
+    /could not find the table/i.test(message) ||
+    /schema cache/i.test(message) ||
+    /does not exist/i.test(message)
+  );
+}
+
+let productWriteQueue: Promise<unknown> = Promise.resolve();
+
+function withProductWriteLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = productWriteQueue.then(fn, fn);
+  productWriteQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+function dedupeProductRows(rows: ShopProductRow[]): ShopProductRow[] {
+  const latest = new Map<string, ShopProductRow>();
+  for (const row of rows) {
+    const existing = latest.get(row.slug);
+    if (
+      !existing ||
+      String(row.updated_at || "") > String(existing.updated_at || "")
+    ) {
+      latest.set(row.slug, row);
+    }
+  }
+  return [...latest.values()];
+}
+
 async function ensureBuckets() {
   const supabase = getSupabase();
   if (!supabase) return false;
@@ -410,6 +457,7 @@ async function writeJsonObject(object: string, value: unknown) {
   const result = await supabase.storage.from(CMS_BUCKET).upload(object, body, {
     upsert: true,
     contentType: "application/json",
+    cacheControl: "0",
   });
   if (result.error) throw new Error(result.error.message);
 }
@@ -448,7 +496,49 @@ async function readProductsFromPostgres(): Promise<Product[] | null> {
     if (isMissingTable(result.error)) return null;
     throw new Error(result.error.message);
   }
-  return ((result.data as ShopProductRow[] | null) ?? []).map(productFromRow);
+  return dedupeProductRows((result.data as ShopProductRow[] | null) ?? []).map(
+    productFromRow,
+  );
+}
+
+async function writeProductToPostgres(product: Product) {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase is not connected.");
+  const row = rowFromProduct(product, product.sortOrder);
+
+  const updated = await supabase
+    .from("shop_products")
+    .update(row)
+    .eq("slug", product.slug)
+    .select("*");
+  if (updated.error) throw new Error(asWriteError(updated.error, "Could not update that product."));
+
+  const rows = dedupeProductRows((updated.data as ShopProductRow[] | null) ?? []);
+  if (rows.length) {
+    const extraIds = ((updated.data as ShopProductRow[] | null) ?? [])
+      .map((entry) => entry.id)
+      .filter((id): id is string => Boolean(id && id !== rows[0].id));
+    if (extraIds.length) {
+      await supabase.from("shop_products").delete().in("id", extraIds);
+    }
+    return productFromRow(rows[0]);
+  }
+
+  const inserted = await supabase.from("shop_products").insert(row).select("*").single();
+  if (inserted.error) {
+    const upserted = await supabase
+      .from("shop_products")
+      .upsert(row, { onConflict: "slug" })
+      .select("*")
+      .single();
+    if (upserted.error) {
+      throw new Error(asWriteError(upserted.error, inserted.error.message));
+    }
+    if (!upserted.data) throw new Error("The database did not save that product.");
+    return productFromRow(upserted.data as ShopProductRow);
+  }
+  if (!inserted.data) throw new Error("The database did not save that product.");
+  return productFromRow(inserted.data as ShopProductRow);
 }
 
 async function writeProductsToPostgres(products: Product[]) {
@@ -458,7 +548,24 @@ async function writeProductsToPostgres(products: Product[]) {
     products.map((product, index) => rowFromProduct(product, index)),
     { onConflict: "slug" },
   );
-  if (result.error) throw new Error(result.error.message);
+  if (result.error) throw new Error(asWriteError(result.error, "Could not save products."));
+}
+
+async function loadProductBySlug(slug: string): Promise<Product | null> {
+  if (await postgresAvailable()) {
+    const supabase = getSupabase();
+    if (supabase) {
+      const result = await supabase.from("shop_products").select("*").eq("slug", slug);
+      if (result.error) {
+        if (!isMissingTable(result.error)) throw new Error(result.error.message);
+      } else {
+        const rows = dedupeProductRows((result.data as ShopProductRow[] | null) ?? []);
+        if (rows[0]) return productFromRow(rows[0]);
+      }
+    }
+  }
+  const stored = await readJsonObject<Product[]>(PRODUCTS_OBJECT);
+  return stored?.find((product) => product.slug === slug) ?? null;
 }
 
 async function deleteProductFromPostgres(slug: string) {
@@ -641,12 +748,18 @@ function sanitizeProduct(input: Partial<Product>, previous?: Product | null): Pr
 }
 
 export async function saveProduct(input: Partial<Product>, previousSlug?: string) {
+  return withProductWriteLock(() => persistProduct(input, previousSlug));
+}
+
+async function persistProduct(input: Partial<Product>, previousSlug?: string) {
   if (!supabaseConfigured()) {
     throw new Error("Connect Supabase in Admin → Database before editing products.");
   }
   const catalog = await loadCatalog();
   const previous =
-    catalog.find((product) => product.slug === (previousSlug || input.slug)) ?? null;
+    (previousSlug ? await loadProductBySlug(previousSlug) : null) ??
+    catalog.find((product) => product.slug === (previousSlug || input.slug)) ??
+    null;
   const next = sanitizeProduct(input, previous);
   const withoutOld = catalog.filter(
     (product) => product.slug !== next.slug && product.slug !== previous?.slug,
@@ -656,20 +769,72 @@ export async function saveProduct(input: Partial<Product>, previousSlug?: string
   }
   const products = sortProducts([...withoutOld, next]);
 
+  let persisted = next;
   if (await postgresAvailable()) {
-    if (previous && previous.slug !== next.slug) {
-      await deleteProductFromPostgres(previous.slug);
+    try {
+      if (previous && previous.slug !== next.slug) {
+        await deleteProductFromPostgres(previous.slug);
+      }
+      persisted = await writeProductToPostgres(next);
+    } catch (error) {
+      if (!isMissingRelation(error)) throw error;
+      await writeJsonObject(PRODUCTS_OBJECT, products);
+      persisted = next;
     }
-    const supabase = getSupabase();
-    if (!supabase) throw new Error("Supabase is not connected.");
-    const result = await supabase.from("shop_products").upsert(rowFromProduct(next, next.sortOrder));
-    if (result.error) throw new Error(result.error.message);
   } else {
     await writeJsonObject(PRODUCTS_OBJECT, products);
+    const stored = await readJsonObject<Product[]>(PRODUCTS_OBJECT);
+    const confirmed = stored?.find((product) => product.slug === next.slug);
+    if (!confirmed) {
+      throw new Error("The product catalog file was not saved.");
+    }
+    const confirmedViews = asViews(confirmed.views);
+    if (next.views) {
+      for (const [colorName, pair] of Object.entries(next.views)) {
+        if (
+          confirmedViews?.[colorName]?.front !== pair.front ||
+          confirmedViews?.[colorName]?.back !== pair.back
+        ) {
+          throw new Error("The product catalog did not keep the new photo URLs.");
+        }
+      }
+    }
+    persisted = sanitizeProduct(confirmed, next);
   }
 
-  revalidateStorefront([next.slug, previous?.slug || ""]);
-  return next;
+  revalidateStorefront([persisted.slug, previous?.slug || ""]);
+  return persisted;
+}
+
+export async function saveProductView(
+  slug: string,
+  color: string,
+  view: "front" | "back",
+  url: string,
+) {
+  return withProductWriteLock(async () => {
+    const product = (await loadProductBySlug(slug)) ?? (await getProduct(slug));
+    if (!product) {
+      throw new Error(`Product "${slug}" was not found in the database.`);
+    }
+    const colorName = color || product.colors[0]?.name || "Default";
+    const views = { ...(product.views ?? {}) };
+    const current = views[colorName] ?? { front: product.image, back: "" };
+    views[colorName] = { ...current, [view]: url };
+    const saved = await persistProduct(
+      {
+        ...product,
+        views,
+        image:
+          colorName === product.colors[0]?.name && view === "front" ? url : product.image,
+      },
+      slug,
+    );
+    if (saved.views?.[colorName]?.[view] !== url) {
+      throw new Error("The database did not keep the new photo URL.");
+    }
+    return saved;
+  });
 }
 
 export async function deleteProduct(slug: string) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import type { Product, ProductColor, ProductViews } from "@/lib/products";
@@ -12,9 +12,14 @@ const inputClass =
 type ProductEditorProps = {
   initial: Product;
   isNew?: boolean;
+  source?: "postgres" | "storage" | "fallback" | string;
 };
 
-export function ProductEditor({ initial, isNew = false }: ProductEditorProps) {
+export function ProductEditor({
+  initial,
+  isNew = false,
+  source,
+}: ProductEditorProps) {
   const router = useRouter();
   const [product, setProduct] = useState(initial);
   const [slugTouched, setSlugTouched] = useState(!isNew);
@@ -30,12 +35,20 @@ export function ProductEditor({ initial, isNew = false }: ProductEditorProps) {
   }
 
   function setColor(index: number, patch: Partial<ProductColor>) {
-    setProduct((current) => ({
-      ...current,
-      colors: current.colors.map((color, colorIndex) =>
+    setProduct((current) => {
+      const previous = current.colors[index];
+      const colors = current.colors.map((color, colorIndex) =>
         colorIndex === index ? { ...color, ...patch } : color,
-      ),
-    }));
+      );
+      const nextName = patch.name;
+      if (!previous || !nextName || nextName === previous.name || !current.views?.[previous.name]) {
+        return { ...current, colors };
+      }
+      const views = { ...current.views };
+      views[nextName] = views[previous.name];
+      delete views[previous.name];
+      return { ...current, colors, views };
+    });
   }
 
   function setView(colorName: string, view: keyof ProductViews, url: string) {
@@ -80,21 +93,16 @@ export function ProductEditor({ initial, isNew = false }: ProductEditorProps) {
         setError(payload.error || "Could not upload that image.");
         return;
       }
-      if (payload.product) {
-        setProduct((current) => ({
-          ...current,
-          views: payload.product?.views ?? current.views,
-          image: payload.product?.image ?? current.image,
-        }));
+      setView(colorName, view, payload.url);
+      if (payload.error) {
+        setError(`${payload.error} Click Save product to keep this photo.`);
       } else {
-        setView(colorName, view, payload.url);
+        setMessage(
+          isNew
+            ? `${view} photo added. Save the product to keep it.`
+            : `${colorName} ${view} photo saved to the database.`,
+        );
       }
-      setMessage(
-        isNew
-          ? `${view} photo added. Save the product to keep it.`
-          : `${colorName} ${view} photo updated.`,
-      );
-      router.refresh();
     } catch (uploadError) {
       setError(
         uploadError instanceof Error
@@ -168,6 +176,17 @@ export function ProductEditor({ initial, isNew = false }: ProductEditorProps) {
         title={isNew ? "New product" : product.name || "Edit product"}
         description="Change the listing customers see: name, price, colors, sizes, photos, and description."
       />
+      {source === "storage" ? (
+        <p className="mb-6 text-sm text-chrome">
+          Photos save to Supabase Storage. Run the SQL on Admin → Database so they
+          also write to the shop_products table.
+        </p>
+      ) : source === "fallback" ? (
+        <p className="mb-6 text-sm text-flagRed">
+          The database is not connected, so photo changes will not stay saved.
+          Connect Supabase in Admin → Database.
+        </p>
+      ) : null}
 
       <form onSubmit={onSubmit} className="grid gap-8">
         <section className="grid gap-4 rounded-md border border-white/10 bg-black/40 p-6 md:grid-cols-2">
@@ -331,7 +350,8 @@ export function ProductEditor({ initial, isNew = false }: ProductEditorProps) {
                         colorName={color.name}
                         view={view}
                         url={views[view] || ""}
-                        busy={uploading === `${color.name}:${view}` || busy}
+                        busy={uploading === `${color.name}:${view}`}
+                        disabled={Boolean(uploading) || busy}
                         onUrlChange={(url) => setView(color.name, view, url)}
                         onFile={(file) => void uploadView(color.name, view, file)}
                       />
@@ -383,6 +403,7 @@ function PhotoSlot({
   view,
   url,
   busy,
+  disabled,
   onUrlChange,
   onFile,
 }: {
@@ -390,22 +411,39 @@ function PhotoSlot({
   view: keyof ProductViews;
   url: string;
   busy: boolean;
+  disabled: boolean;
   onUrlChange: (url: string) => void;
   onFile: (file: File) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const blobRef = useRef("");
+  const [preview, setPreview] = useState(url);
+
+  useEffect(() => {
+    if (!busy) setPreview(url);
+  }, [busy, url]);
+
+  useEffect(() => {
+    return () => {
+      if (blobRef.current) URL.revokeObjectURL(blobRef.current);
+    };
+  }, []);
 
   function takeFile(fileList: FileList | null) {
     const file = fileList?.[0];
-    if (file) onFile(file);
+    if (!file || disabled) return;
+    if (blobRef.current) URL.revokeObjectURL(blobRef.current);
+    blobRef.current = URL.createObjectURL(file);
+    setPreview(blobRef.current);
+    onFile(file);
   }
 
   return (
-    <div className="grid gap-2 text-sm">
+    <div className="relative grid gap-2 text-sm">
       <p className="capitalize">{view} photo</p>
       <button
         type="button"
-        disabled={busy}
+        disabled={disabled}
         aria-label={`Replace ${colorName} ${view} photo`}
         onClick={() => inputRef.current?.click()}
         onDragOver={(event) => event.preventDefault()}
@@ -415,9 +453,9 @@ function PhotoSlot({
         }}
         className="relative block overflow-hidden rounded-sm border border-white/10 bg-black disabled:opacity-60"
       >
-        {url ? (
+        {preview ? (
           <img
-            src={url}
+            src={preview}
             alt={`${colorName} ${view}`}
             className="h-28 w-full object-cover"
           />
@@ -445,7 +483,8 @@ function PhotoSlot({
         ref={inputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp,image/gif"
-        className="sr-only"
+        tabIndex={-1}
+        className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0"
         aria-label={`Upload ${colorName} ${view} photo`}
         onChange={(event) => {
           takeFile(event.target.files);
@@ -454,7 +493,7 @@ function PhotoSlot({
       />
       <button
         type="button"
-        disabled={busy}
+        disabled={disabled}
         onClick={() => inputRef.current?.click()}
         className="w-fit rounded border border-white/20 px-3 py-2 font-display text-xs tracking-[0.14em] uppercase disabled:opacity-60"
       >

@@ -115,6 +115,26 @@ create index if not exists orders_created_at_idx on public.orders (created_at de
 create index if not exists order_items_order_id_idx on public.order_items (order_id);
 create index if not exists shop_products_sort_idx on public.shop_products (sort_order, name);
 
+alter table public.shop_products add column if not exists views jsonb not null default '{}'::jsonb;
+alter table public.shop_products add column if not exists image text not null default '';
+alter table public.shop_products add column if not exists created_at timestamptz not null default now();
+alter table public.shop_products add column if not exists updated_at timestamptz not null default now();
+
+-- Keep one row per slug, then enforce uniqueness so photo updates cannot
+-- insert a second product and leave the shop reading the old images.
+delete from public.shop_products a
+using public.shop_products b
+where a.slug = b.slug
+  and (
+    coalesce(a.updated_at, a.created_at) < coalesce(b.updated_at, b.created_at)
+    or (
+      coalesce(a.updated_at, a.created_at) = coalesce(b.updated_at, b.created_at)
+      and a.id < b.id
+    )
+  );
+
+create unique index if not exists shop_products_slug_key on public.shop_products (slug);
+
 alter table public.orders add column if not exists shipping numeric(10,2) not null default 0;
 
 alter table public.carts enable row level security;

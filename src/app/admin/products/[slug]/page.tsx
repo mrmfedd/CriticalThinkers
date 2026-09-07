@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { isAdmin } from "@/lib/admin-auth";
 import { AdminLoginForm } from "@/components/admin/AdminLoginForm";
 import { ProductEditor } from "@/components/admin/ProductEditor";
-import { getProduct } from "@/lib/cms";
+import { getProduct, probeCms } from "@/lib/cms";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -26,7 +26,7 @@ export default async function AdminProductPage({ params }: Props) {
   }
 
   const { slug } = await params;
-  const product = await getProduct(slug);
+  const [product, cms] = await Promise.all([getProduct(slug), probeCms()]);
   if (!product) notFound();
-  return <ProductEditor initial={product} />;
+  return <ProductEditor initial={product} source={cms.source} />;
 }

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { isAdmin } from "@/lib/admin-auth";
 import { AdminLoginForm } from "@/components/admin/AdminLoginForm";
 import { ProductEditor } from "@/components/admin/ProductEditor";
-import { emptyProduct } from "@/lib/cms";
+import { emptyProduct, probeCms } from "@/lib/cms";
 
 export const metadata: Metadata = {
   title: "New product",
@@ -16,5 +16,6 @@ export default async function AdminNewProductPage() {
     return <AdminLoginForm />;
   }
 
-  return <ProductEditor initial={emptyProduct()} isNew />;
+  const cms = await probeCms();
+  return <ProductEditor initial={emptyProduct()} isNew source={cms.source} />;
 }

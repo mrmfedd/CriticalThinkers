@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { unauthorizedUnlessAdmin } from "@/lib/admin-auth";
-import { getProduct, saveProduct, saveSiteSettings, uploadCmsImage } from "@/lib/cms";
+import { saveProductView, saveSiteSettings, uploadCmsImage } from "@/lib/cms";
 
 export const runtime = "nodejs";
 
@@ -38,28 +38,16 @@ export async function POST(request: Request) {
     }
 
     if (apply === "product" && slug) {
-      const product = await getProduct(slug);
-      if (!product) {
-        return NextResponse.json({ url, error: "Product not found for apply." }, { status: 200 });
+      try {
+        const product = await saveProductView(slug, color, view, url);
+        return NextResponse.json({ url, product });
+      } catch (applyError) {
+        const message =
+          applyError instanceof Error
+            ? applyError.message
+            : "Could not save that photo to the product.";
+        return NextResponse.json({ url, error: message }, { status: 200 });
       }
-      const views = { ...(product.views ?? {}) };
-      const current = views[color] ?? { front: product.image, back: "" };
-      views[color || product.colors[0]?.name || "Default"] = {
-        ...current,
-        [view]: url,
-      };
-      const updated = await saveProduct(
-        {
-          ...product,
-          views,
-          image:
-            (!color || color === product.colors[0]?.name) && view === "front"
-              ? url
-              : product.image,
-        },
-        slug,
-      );
-      return NextResponse.json({ url, product: updated });
     }
 
     return NextResponse.json({ url });
