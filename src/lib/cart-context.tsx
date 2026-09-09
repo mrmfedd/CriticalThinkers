@@ -28,7 +28,7 @@ type CartContextValue = {
   databaseConnected: boolean;
 };
 
-const STORAGE_KEY = "ct-cart-v2";
+const STORAGE_KEY = "ct-cart-v3";
 const CartContext = createContext<CartContextValue | null>(null);
 
 function makeId(slug: string, size: string, color: string) {
