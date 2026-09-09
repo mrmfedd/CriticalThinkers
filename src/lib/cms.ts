@@ -2,7 +2,7 @@ import { cache } from "react";
 import { revalidatePath } from "next/cache";
 import { designTees } from "@/lib/design-tees";
 import { contactHrefs, site } from "@/lib/site";
-import { getSupabase, supabaseConfigured } from "@/lib/supabase";
+import { getSupabase, getSupabaseConfig, supabaseConfigured } from "@/lib/supabase";
 import { TEE_PRICE, migrateLegacyTeePrices } from "@/lib/commerce";
 import { slugify, type Product, type ProductColor, type ProductViews } from "@/lib/products";
 
@@ -440,6 +440,22 @@ async function postgresAvailable() {
 async function readJsonObject<T>(object: string): Promise<T | null> {
   const supabase = getSupabase();
   if (!supabase) return null;
+  const config = getSupabaseConfig();
+  const key = config.serviceRoleKey || config.anonKey;
+  if (config.url && key) {
+    const endpoint = `${config.url.replace(/\/$/, "")}/storage/v1/object/authenticated/${CMS_BUCKET}/${encodeURIComponent(object)}`;
+    const response = await fetch(endpoint, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+      },
+      cache: "no-store",
+    });
+    if (response.ok) {
+      return JSON.parse(await response.text()) as T;
+    }
+    if (response.status === 404) return null;
+  }
   const result = await supabase.storage.from(CMS_BUCKET).download(object);
   if (result.error || !result.data) {
     if (isMissingObject(result.error)) return null;
@@ -654,10 +670,20 @@ async function loadCatalog(): Promise<Product[]> {
       if (products?.length) return sortProducts(migrateLegacyTeePrices(products));
     }
     const stored = await readJsonObject<Product[]>(PRODUCTS_OBJECT);
-    if (stored?.length) return sortProducts(migrateLegacyTeePrices(stored).map((product, index) => ({
-      ...product,
-      sortOrder: product.sortOrder ?? index,
-    })));
+    if (stored?.length) {
+      const migrated = migrateLegacyTeePrices(stored);
+      if (migrated !== stored) {
+        try {
+          await writeJsonObject(PRODUCTS_OBJECT, migrated);
+        } catch {
+          // Still serve $29 even if the catalog file cannot be rewritten.
+        }
+      }
+      return sortProducts(migrated.map((product, index) => ({
+        ...product,
+        sortOrder: product.sortOrder ?? index,
+      })));
+    }
   } catch {
     // Fall back to the built-in catalog so the shop still renders.
   }
