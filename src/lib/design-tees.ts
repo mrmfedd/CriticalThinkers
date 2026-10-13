@@ -54,6 +54,9 @@ function tee(
   };
 }
 
+/** Still in DB from older catalogs; filtered out in `getCatalog`. */
+export const retiredProductSlugs = new Set(["design-14-tee"]);
+
 export const designTees: Product[] = [
   tee(
     1,
@@ -125,11 +128,6 @@ export const designTees: Product[] = [
     13,
     "False Knowledge Tee",
     "Beware of false knowledge. It is more dangerous than ignorance. Shaw, over the news logos.",
-  ),
-  tee(
-    14,
-    "I See Dead People Voting Tee",
-    "The Sixth Sense still, rewritten for election season.",
   ),
   tee(
     15,

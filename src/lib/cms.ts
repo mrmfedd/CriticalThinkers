@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { revalidatePath } from "next/cache";
-import { designTees } from "@/lib/design-tees";
+import { designTees, retiredProductSlugs } from "@/lib/design-tees";
 import { contactHrefs, site } from "@/lib/site";
 import { getSupabase, getSupabaseConfig, supabaseConfigured } from "@/lib/supabase";
 import { TEE_PRICE, migrateLegacyTeePrices } from "@/lib/commerce";
@@ -354,6 +354,10 @@ function sortProducts(products: Product[]) {
   );
 }
 
+function withoutRetiredProducts(products: Product[]) {
+  return products.filter((product) => !retiredProductSlugs.has(product.slug));
+}
+
 function isMissingObject(error: { message?: string; statusCode?: string } | null) {
   if (!error) return false;
   const message = error.message || "";
@@ -667,7 +671,9 @@ async function loadCatalog(): Promise<Product[]> {
     await seedIfNeeded();
     if (await postgresAvailable()) {
       const products = await readProductsFromPostgres();
-      if (products?.length) return sortProducts(migrateLegacyTeePrices(products));
+      if (products?.length) {
+        return sortProducts(withoutRetiredProducts(migrateLegacyTeePrices(products)));
+      }
     }
     const stored = await readJsonObject<Product[]>(PRODUCTS_OBJECT);
     if (stored?.length) {
@@ -679,15 +685,19 @@ async function loadCatalog(): Promise<Product[]> {
           // Still serve $29 even if the catalog file cannot be rewritten.
         }
       }
-      return sortProducts(migrated.map((product, index) => ({
-        ...product,
-        sortOrder: product.sortOrder ?? index,
-      })));
+      return sortProducts(
+        withoutRetiredProducts(
+          migrated.map((product, index) => ({
+            ...product,
+            sortOrder: product.sortOrder ?? index,
+          })),
+        ),
+      );
     }
   } catch {
     // Fall back to the built-in catalog so the shop still renders.
   }
-  return seedProducts();
+  return withoutRetiredProducts(seedProducts());
 }
 
 export const getSiteSettings = cache(loadSiteSettings);
