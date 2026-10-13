@@ -308,21 +308,27 @@ export async function listOrders(limit = 50): Promise<StoredOrder[]> {
     "id, customer_name, email, phone, address, city, state, zip, subtotal, shipping, status, paid_with, paypal_capture_id, created_at, order_items(name, quantity, size, color_name, unit_price)";
   const fallbackColumns =
     "id, customer_name, email, phone, address, city, state, zip, subtotal, status, paid_with, paypal_capture_id, created_at, order_items(name, quantity, size, color_name, unit_price)";
-  let result = await supabase
+  const primary = await supabase
     .from("orders")
     .select(columns)
     .order("created_at", { ascending: false })
     .limit(limit);
-  if (result.error && /shipping/i.test(result.error.message || "")) {
-    result = await supabase
+
+  let orderRows: Array<Record<string, unknown>> | null = null;
+  if (primary.error && /shipping/i.test(primary.error.message || "")) {
+    const fallback = await supabase
       .from("orders")
       .select(fallbackColumns)
       .order("created_at", { ascending: false })
       .limit(limit);
+    throwIfStoreError(fallback.error);
+    orderRows = fallback.data as Array<Record<string, unknown>> | null;
+  } else {
+    throwIfStoreError(primary.error);
+    orderRows = primary.data as Array<Record<string, unknown>> | null;
   }
-  throwIfStoreError(result.error);
 
-  return ((result.data as Array<Record<string, unknown>> | null) ?? []).map((row) => ({
+  return (orderRows ?? []).map((row) => ({
     id: String(row.id),
     customer_name: String(row.customer_name),
     email: String(row.email),
