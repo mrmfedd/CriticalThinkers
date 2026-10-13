@@ -2,18 +2,25 @@
 
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { Footer } from "@/components/Footer";
+import type { PublicSite } from "@/lib/cms";
 
 export function StorefrontChrome({
   header,
-  footer,
+  homeBottom,
+  logoSrc,
+  site,
   children,
 }: {
   header: ReactNode;
-  footer: ReactNode;
+  homeBottom?: ReactNode;
+  logoSrc: string;
+  site: PublicSite;
   children: ReactNode;
 }) {
   const pathname = usePathname();
   const admin = pathname.startsWith("/admin");
+  const home = pathname === "/";
 
   return (
     <>
@@ -25,7 +32,10 @@ export function StorefrontChrome({
       >
         {children}
       </main>
-      {admin ? null : footer}
+      {!admin && home && homeBottom ? homeBottom : null}
+      {admin ? null : (
+        <Footer logoSrc={logoSrc} site={site} className={home ? "mt-0" : "mt-16"} />
+      )}
     </>
   );
 }

@@ -59,22 +59,6 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
-
-      <section className="grid gap-8 rounded-md border border-white/10 bg-black/30 p-8 md:grid-cols-2">
-        <div>
-          <h2 className="font-display text-3xl text-white">{site.homeStoryHeading}</h2>
-          <p className="mt-4 leading-7 text-steel">{site.homeStoryBody}</p>
-        </div>
-        <div className="grid gap-2 self-center text-steel">
-          <p className="text-white">{site.owner}</p>
-          <a href={site.emailHref} className="hover:text-white">
-            {site.email}
-          </a>
-          <a href={site.phoneHref} className="hover:text-white">
-            {site.phoneDisplay}
-          </a>
-        </div>
-      </section>
     </div>
   );
 }

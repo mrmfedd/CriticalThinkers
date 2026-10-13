@@ -4,12 +4,14 @@ import type { PublicSite } from "@/lib/cms";
 export function Footer({
   logoSrc = "/brand/logo.jpg",
   site,
+  className = "mt-16",
 }: {
   logoSrc?: string;
   site: PublicSite;
+  className?: string;
 }) {
   return (
-    <footer className="mt-16 border-t border-white/10 bg-black/50">
+    <footer className={`border-t border-white/10 bg-black/50 ${className}`}>
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 md:grid-cols-3">
         <div>
           <img
