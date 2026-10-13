@@ -12,7 +12,29 @@ export function Footer({
 }) {
   return (
     <footer className={`border-t border-white/10 bg-black/50 ${className}`}>
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 md:grid-cols-3">
+      <div className="mx-auto max-w-6xl px-4 py-10">
+        <div
+          className="grid gap-8 rounded-md border border-white/10 bg-black/30 p-8 md:grid-cols-2"
+          aria-labelledby="footer-story-heading"
+        >
+          <div>
+            <h2 id="footer-story-heading" className="font-display text-3xl text-white">
+              {site.homeStoryHeading}
+            </h2>
+            <p className="mt-4 leading-7 text-steel">{site.homeStoryBody}</p>
+          </div>
+          <div className="grid gap-2 self-center text-steel">
+            <p className="text-white">{site.owner}</p>
+            <a href={site.emailHref} className="hover:text-white">
+              {site.email}
+            </a>
+            <a href={site.phoneHref} className="hover:text-white">
+              {site.phoneDisplay}
+            </a>
+          </div>
+        </div>
+      </div>
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 md:grid-cols-2">
         <div>
           <img
             src={logoSrc}
@@ -38,20 +60,6 @@ export function Footer({
             <Link href="/cart" className="hover:text-white">
               Cart
             </Link>
-          </div>
-        </div>
-        <div>
-          <h2 className="font-display text-sm tracking-[0.2em] text-white uppercase">
-            Contact
-          </h2>
-          <div className="mt-4 grid gap-2 text-sm text-steel">
-            <p className="text-white">{site.owner}</p>
-            <a href={site.emailHref} className="hover:text-white">
-              {site.email}
-            </a>
-            <a href={site.phoneHref} className="hover:text-white">
-              {site.phoneDisplay}
-            </a>
           </div>
         </div>
       </div>
