@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Oswald, IBM_Plex_Sans } from "next/font/google";
 import { CartProvider } from "@/lib/cart-context";
 import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
+import { HomeStoryBand } from "@/components/HomeStoryBand";
 import { StorefrontChrome } from "@/components/StorefrontChrome";
 import { getSiteSettings } from "@/lib/cms";
 import "./globals.css";
@@ -51,7 +51,9 @@ export default async function RootLayout({
                 tagline={settings.tagline}
               />
             }
-            footer={<Footer logoSrc={settings.logoUrl} site={settings} />}
+            homeBottom={<HomeStoryBand site={settings} />}
+            logoSrc={settings.logoUrl}
+            site={settings}
           >
             {children}
           </StorefrontChrome>
