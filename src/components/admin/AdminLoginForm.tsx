@@ -26,13 +26,9 @@ export function AdminLoginForm() {
             type="password"
             autoComplete="current-password"
             required
-            defaultValue="ThinkAgain2026"
             className="rounded border border-white/20 bg-black px-3 py-2 text-white"
           />
         </label>
-        <p className="mt-2 text-xs text-steel">
-          Password: <span className="text-white">ThinkAgain2026</span>
-        </p>
         {state?.error ? (
           <p className="mt-3 text-sm text-flagRed">{state.error}</p>
         ) : null}

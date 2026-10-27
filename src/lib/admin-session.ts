@@ -54,14 +54,41 @@ export async function isValidSessionToken(token: string | undefined) {
   return (await sha256(token)) === (await sha256(expected));
 }
 
+function normalizePassword(value: string) {
+  return value.replace(/\s/g, "");
+}
+
+/** All valid admin passwords from ADMIN_PASSWORD and ADMIN_PASSWORDS (comma/newline/semicolon). */
+export function configuredAdminPasswords(): string[] {
+  const collected: string[] = [];
+
+  const single = process.env.ADMIN_PASSWORD?.trim();
+  if (single) collected.push(normalizePassword(single));
+
+  const list = process.env.ADMIN_PASSWORDS?.trim();
+  if (list) {
+    for (const part of list.split(/[,;\n]+/)) {
+      const trimmed = part.trim();
+      if (trimmed) collected.push(normalizePassword(trimmed));
+    }
+  }
+
+  if (collected.length === 0) {
+    collected.push("ThinkAgain2026");
+  }
+
+  return [...new Set(collected)];
+}
+
 export async function passwordsMatch(input: string) {
-  const expected = (process.env.ADMIN_PASSWORD || "ThinkAgain2026").replace(
-    /\s/g,
-    "",
-  );
-  const attempt = input.replace(/\s/g, "");
-  if (!expected || !attempt) return false;
-  return (await sha256(attempt)) === (await sha256(expected));
+  const attempt = normalizePassword(input);
+  if (!attempt) return false;
+
+  const attemptHash = await sha256(attempt);
+  for (const password of configuredAdminPasswords()) {
+    if ((await sha256(password)) === attemptHash) return true;
+  }
+  return false;
 }
 
 export function sessionCookieOptions() {
