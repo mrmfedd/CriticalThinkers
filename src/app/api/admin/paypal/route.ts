@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { unauthorizedUnlessAdmin } from "@/lib/admin-auth";
 import {
   clearPayPalConfig,
   getPayPalAdminView,
@@ -11,10 +12,14 @@ import {
 export const runtime = "nodejs";
 
 export async function GET() {
+  const denied = await unauthorizedUnlessAdmin("integrations");
+  if (denied) return denied;
   return NextResponse.json({ config: getPayPalAdminView() });
 }
 
 export async function POST(request: Request) {
+  const denied = await unauthorizedUnlessAdmin("integrations");
+  if (denied) return denied;
   const body = (await request.json().catch(() => null)) as
     | { clientId?: string; clientSecret?: string; mode?: string }
     | null;
@@ -47,6 +52,8 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE() {
+  const denied = await unauthorizedUnlessAdmin("integrations");
+  if (denied) return denied;
   clearPayPalConfig();
   return NextResponse.json({ config: getPayPalAdminView() });
 }

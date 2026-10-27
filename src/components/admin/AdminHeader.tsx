@@ -6,9 +6,10 @@ import { usePathname } from "next/navigation";
 const links = [
   { href: "/admin", label: "Website" },
   { href: "/admin/products", label: "Products" },
+  { href: "/admin/orders", label: "Orders" },
+  { href: "/admin/users", label: "Team" },
   { href: "/admin/paypal", label: "PayPal" },
   { href: "/admin/database", label: "Database" },
-  { href: "/admin/orders", label: "Orders" },
 ];
 
 export function AdminHeader({

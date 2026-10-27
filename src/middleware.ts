@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isValidSessionToken } from "@/lib/admin-session";
+import { parseAdminSessionToken } from "@/lib/admin-session";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -7,7 +7,7 @@ export async function middleware(request: NextRequest) {
   if (pathname === "/api/admin/login") return NextResponse.next();
 
   const token = request.cookies.get("ct_admin")?.value;
-  if (await isValidSessionToken(token)) return NextResponse.next();
+  if (await parseAdminSessionToken(token)) return NextResponse.next();
 
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }

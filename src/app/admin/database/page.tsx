@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { isAdmin } from "@/lib/admin-auth";
+import { isAdmin, isOwner } from "@/lib/admin-auth";
+import { AdminAccessDenied } from "@/components/admin/AdminAccessDenied";
 import { AdminLoginForm } from "@/components/admin/AdminLoginForm";
 import { SupabaseConnectForm } from "@/components/admin/SupabaseConnectForm";
 import { probeCms } from "@/lib/cms";
@@ -26,6 +27,9 @@ function schemaSql() {
 export default async function AdminDatabasePage() {
   if (!(await isAdmin())) {
     return <AdminLoginForm />;
+  }
+  if (!(await isOwner())) {
+    return <AdminAccessDenied area="database connection" />;
   }
 
   return (

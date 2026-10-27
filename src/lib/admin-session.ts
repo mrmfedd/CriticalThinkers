@@ -1,5 +1,6 @@
 const COOKIE = "ct_admin";
 const PAYLOAD = "admin-session-v1";
+const PAYLOAD_V2 = "admin-session-v2:";
 
 function hex(buffer: ArrayBuffer) {
   return Array.from(new Uint8Array(buffer))
@@ -44,14 +45,50 @@ export function adminCookieName() {
   return COOKIE;
 }
 
-export async function createSessionToken() {
+export async function createLegacySessionToken() {
   return hmac(PAYLOAD);
 }
 
+export async function createUserSessionToken(userId: string) {
+  const signature = await hmac(`${PAYLOAD_V2}${userId}`);
+  return `${userId}.${signature}`;
+}
+
+export type ParsedAdminToken =
+  | { kind: "legacy" }
+  | { kind: "user"; userId: string };
+
+export async function parseAdminSessionToken(
+  token: string | undefined,
+): Promise<ParsedAdminToken | null> {
+  if (!token) return null;
+
+  const dot = token.indexOf(".");
+  if (dot > 0) {
+    const userId = token.slice(0, dot);
+    const signature = token.slice(dot + 1);
+    const expected = await hmac(`${PAYLOAD_V2}${userId}`);
+    if ((await sha256(signature)) === (await sha256(expected))) {
+      return { kind: "user", userId };
+    }
+    return null;
+  }
+
+  const expected = await createLegacySessionToken();
+  if ((await sha256(token)) === (await sha256(expected))) {
+    return { kind: "legacy" };
+  }
+  return null;
+}
+
+/** @deprecated Use parseAdminSessionToken */
+export async function createSessionToken() {
+  return createLegacySessionToken();
+}
+
+/** @deprecated Use parseAdminSessionToken */
 export async function isValidSessionToken(token: string | undefined) {
-  if (!token) return false;
-  const expected = await createSessionToken();
-  return (await sha256(token)) === (await sha256(expected));
+  return (await parseAdminSessionToken(token)) !== null;
 }
 
 function normalizePassword(value: string) {

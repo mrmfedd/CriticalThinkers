@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { unauthorizedUnlessAdmin } from "@/lib/admin-auth";
 import { revertImage } from "@/lib/image-store";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const denied = await unauthorizedUnlessAdmin("cms");
+  if (denied) return denied;
   const body = (await request.json().catch(() => null)) as
     | { kind?: string; key?: string }
     | null;

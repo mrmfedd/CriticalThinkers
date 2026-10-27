@@ -144,6 +144,20 @@ alter table public.order_items enable row level security;
 alter table public.site_settings enable row level security;
 alter table public.shop_products enable row level security;
 
+create table if not exists public.admin_users (
+  id uuid primary key default gen_random_uuid(),
+  email text not null unique,
+  name text not null,
+  role text not null default 'editor' check (role in ('owner', 'editor')),
+  active boolean not null default true,
+  password_hash text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists admin_users_email_idx on public.admin_users (email);
+
+alter table public.admin_users enable row level security;
+
 do $$
 begin
   insert into storage.buckets (id, name, public, file_size_limit)

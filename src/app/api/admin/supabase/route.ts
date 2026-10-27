@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { unauthorizedUnlessAdmin } from "@/lib/admin-auth";
 import { probeStore } from "@/lib/cart-store";
 import {
   DEFAULT_SUPABASE_URL,
@@ -22,6 +23,8 @@ function schemaSql() {
 }
 
 export async function GET() {
+  const denied = await unauthorizedUnlessAdmin("integrations");
+  if (denied) return denied;
   const probe = await probeStore();
   return NextResponse.json({
     config: getSupabaseAdminView(),
@@ -31,6 +34,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const denied = await unauthorizedUnlessAdmin("integrations");
+  if (denied) return denied;
   if (supabaseEnvLocked()) {
     return NextResponse.json(
       { error: "Supabase credentials are locked by environment variables." },
@@ -73,6 +78,8 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE() {
+  const denied = await unauthorizedUnlessAdmin("integrations");
+  if (denied) return denied;
   if (supabaseEnvLocked()) {
     return NextResponse.json(
       { error: "Supabase credentials are locked by environment variables." },

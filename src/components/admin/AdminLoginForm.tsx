@@ -17,9 +17,20 @@ export function AdminLoginForm() {
         </p>
         <h1 className="mt-2 font-display text-4xl text-white">Admin</h1>
         <p className="mt-3 text-sm text-steel">
-          Sign in to edit the website, products, images, PayPal, and orders.
+          Team members sign in with email and password. Owners can also use the
+          master password with email left blank.
         </p>
         <label className="mt-6 grid gap-1 text-sm text-steel">
+          Email
+          <input
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            className="rounded border border-white/20 bg-black px-3 py-2 text-white"
+          />
+        </label>
+        <label className="mt-4 grid gap-1 text-sm text-steel">
           Password
           <input
             name="password"

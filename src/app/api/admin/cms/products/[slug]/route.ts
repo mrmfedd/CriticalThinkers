@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { unauthorizedUnlessAdmin } from "@/lib/admin-auth";
 import { deleteProduct, getProduct, saveProduct } from "@/lib/cms";
 
 export const runtime = "nodejs";
@@ -8,6 +9,8 @@ type Context = {
 };
 
 export async function GET(_request: Request, context: Context) {
+  const denied = await unauthorizedUnlessAdmin("cms");
+  if (denied) return denied;
   const { slug } = await context.params;
   const product = await getProduct(slug);
   if (!product) {
@@ -17,6 +20,8 @@ export async function GET(_request: Request, context: Context) {
 }
 
 export async function PUT(request: Request, context: Context) {
+  const denied = await unauthorizedUnlessAdmin("cms");
+  if (denied) return denied;
   const { slug } = await context.params;
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) {
@@ -33,6 +38,8 @@ export async function PUT(request: Request, context: Context) {
 }
 
 export async function DELETE(_request: Request, context: Context) {
+  const denied = await unauthorizedUnlessAdmin("cms");
+  if (denied) return denied;
   const { slug } = await context.params;
   try {
     await deleteProduct(slug);
